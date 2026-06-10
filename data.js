@@ -88,6 +88,16 @@ const POINTAGE_LABELS = {
   CS:  'Congé sans solde'
 };
 
+// ===== Cumuls CP / RTT =====
+const CP_PER_MONTH  = 2.5;                 // jours de CP acquis à la fin de chaque mois (tous)
+const RTT_ANNUAL    = { Charles: 13 };     // dotation RTT annuelle (Charles uniquement)
+const ACCRUAL_START = { y: 2026, m: 5 };   // début d'acquisition des CP : juin 2026 (m: 0=janv)
+// Report / solde initial au début de la période (en jours). Vide = 0. Ex : Emilie: { cp: 10 }
+const OPENING_BALANCE = {};
+// Règles métier : poser des CP/RTT ne réduit PAS l'acquisition. En toute rigueur, le congé sans
+// solde (CS) ne génère pas de CP, et l'arrêt maladie non pro génère 2 j/mois (loi 2024) — ces
+// réductions ne sont PAS appliquées automatiquement dans les compteurs (à ajuster si besoin).
+
 // Heures supplémentaires — { 'AAAA-MM-JJ': [ { person, label, hours } ] }
 const EXTRA_HOURS = {
   '2026-06-24': [ { person: 'Emilie', label: '19h–22h', hours: 3 } ]

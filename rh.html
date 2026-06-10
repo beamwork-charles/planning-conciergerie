@@ -137,7 +137,7 @@
       <div>
         <div class="text-xs font-extrabold uppercase tracking-wider text-slate-500 mb-2">Compteurs</div>
         <table class="counters" id="counters-table"></table>
-        <div class="text-[10px] text-slate-400 mt-1">CP / RTT = jours posés sur l'année 2026 · H. supp = total du mois affiché.</div>
+        <div class="text-[10px] text-slate-400 mt-1">CP acquis : 2,5 j/mois depuis juin 2026 (+ report initial). RTT : dotation annuelle (Charles). Solde = acquis − pris, à fin du mois affiché. H. supp = total du mois.</div>
       </div>
     </div>
   </div>
@@ -257,23 +257,52 @@ function renderTable() {
   document.getElementById('ts-table').innerHTML = head + body;
 }
 
+// Formatage jours (2,5 / 5 / -2,5)
+function fmtNum(n) { return Number.isInteger(n) ? String(n) : n.toFixed(1).replace('.', ','); }
+// Nb de mois acquis (≥0) du début d'acquisition jusqu'au mois affiché inclus
+function monthsAccrued(y, m) { return Math.max(0, (y * 12 + m) - (ACCRUAL_START.y * 12 + ACCRUAL_START.m) + 1); }
+// CP acquis à fin du mois affiché = report initial + 2,5 × mois écoulés
+function cpAcquired(person, y, m) {
+  const op = (OPENING_BALANCE[person] && OPENING_BALANCE[person].cp) || 0;
+  return op + CP_PER_MONTH * monthsAccrued(y, m);
+}
+// Jours d'un type posés entre le début d'acquisition et la fin du mois affiché (cumul à date)
+function countTypeUpTo(person, type, y, m) {
+  const a = ABSENCES[person] || {};
+  const startIdx = ACCRUAL_START.y * 12 + ACCRUAL_START.m;
+  const viewIdx = y * 12 + m;
+  let n = 0;
+  for (const ds in a) {
+    if (a[ds] !== type) continue;
+    const d = parseD(ds), idx = d.getFullYear() * 12 + d.getMonth();
+    if (idx >= startIdx && idx <= viewIdx) n++;
+  }
+  return n;
+}
+
 function renderCounters() {
   let html = '<thead><tr><th class="name" style="text-align:left">Collaborateur</th>'
-    + '<th>CP mois</th><th>CP 2026</th><th>RTT mois</th><th>RTT 2026</th><th>H. supp mois</th></tr></thead><tbody>';
+    + '<th>CP acquis</th><th>CP pris</th><th>CP solde</th>'
+    + '<th>RTT acquis</th><th>RTT pris</th><th>RTT solde</th>'
+    + '<th>H. supp mois</th></tr></thead><tbody>';
   for (const p of PEOPLE) {
     const c = COLOR_HEX[COLLABORATORS[p].color];
     const canRtt = !!COLLABORATORS[p].rtt;
-    const cpM = countType(p, 'CP', currentMonth);
-    const cpY = countType(p, 'CP', null);
-    const rttM = countType(p, 'RTT', currentMonth);
-    const rttY = countType(p, 'RTT', null);
+    const cpAcq = cpAcquired(p, currentYear, currentMonth);
+    const cpTaken = countTypeUpTo(p, 'CP', currentYear, currentMonth);
+    const cpSolde = cpAcq - cpTaken;
     const ot = sumExtra(p, currentMonth);
     html += `<tr><td class="name" style="--c:${c}">${COLLABORATORS[p].shortName}</td>`;
-    html += `<td class="num">${cpM || '0'}</td><td class="num">${cpY || '0'}</td>`;
+    html += `<td class="num">${fmtNum(cpAcq)}</td><td class="num">${fmtNum(cpTaken)}</td>`;
+    html += `<td class="num" style="color:${cpSolde < 0 ? '#dc2626' : '#166534'}">${fmtNum(cpSolde)}</td>`;
     if (canRtt) {
-      html += `<td class="num">${rttM || '0'}</td><td class="num">${rttY || '0'}</td>`;
+      const rttAcq = (RTT_ANNUAL[p] || 0) + ((OPENING_BALANCE[p] && OPENING_BALANCE[p].rtt) || 0);
+      const rttTaken = countTypeUpTo(p, 'RTT', currentYear, currentMonth);
+      const rttSolde = rttAcq - rttTaken;
+      html += `<td class="num">${fmtNum(rttAcq)}</td><td class="num">${fmtNum(rttTaken)}</td>`;
+      html += `<td class="num" style="color:${rttSolde < 0 ? '#dc2626' : '#6d28d9'}">${fmtNum(rttSolde)}</td>`;
     } else {
-      html += `<td class="greyed">—</td><td class="greyed">—</td>`;
+      html += `<td class="greyed">—</td><td class="greyed">—</td><td class="greyed">—</td>`;
     }
     html += `<td class="num">${ot ? '+' + ot + 'h' : '—'}</td></tr>`;
   }
