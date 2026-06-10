@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Pointage RH · TB3 & TB4 · 2026</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+<style>
+  * { box-sizing: border-box; }
+  html, body {
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+    min-height: 100vh; color: #0f172a; -webkit-font-smoothing: antialiased;
+  }
+  .glass {
+    background: rgba(255,255,255,0.8); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255,255,255,0.5); box-shadow: 0 1px 3px rgba(15,23,42,.04), 0 4px 20px rgba(15,23,42,.04);
+  }
+  .hidden { display: none !important; }
+
+  /* ===== Feuille de pointage ===== */
+  .sheet { background: white; border-radius: 16px; padding: 18px 20px; box-shadow: 0 4px 24px rgba(15,23,42,.06); }
+  .sheet-title { font-size: 20px; font-weight: 900; letter-spacing: -0.01em; }
+  .sheet-sub { font-size: 12px; color: #64748b; font-weight: 600; }
+
+  table.ts { border-collapse: collapse; width: 100%; table-layout: fixed; }
+  table.ts th, table.ts td { border: 1px solid #e2e8f0; text-align: center; }
+  table.ts thead th { background: #f8fafc; font-weight: 800; color: #475569; font-size: 10px; padding: 3px 1px; }
+  table.ts thead th.we { background: #eef2f6; color: #94a3b8; }
+  table.ts .wd { font-size: 8px; font-weight: 700; color: #94a3b8; display: block; line-height: 1; }
+  table.ts td.name, table.ts th.name {
+    text-align: left; padding: 4px 8px; font-weight: 800; font-size: 11px;
+    width: 92px; white-space: nowrap; background: #fff; position: sticky; left: 0;
+  }
+  table.ts td.name { border-left: 3px solid var(--c, #94a3b8); }
+  table.ts td.c { height: 30px; font-weight: 800; font-size: 11px; padding: 0; position: relative; }
+  table.ts td.c .cd { display: block; line-height: 1.05; }
+  table.ts td.c .ot { display: block; font-size: 8px; font-weight: 800; color: #b45309; line-height: 1; margin-top: 1px; }
+  table.ts td.off { background: repeating-linear-gradient(135deg, #f1f5f9 0 5px, #e9eef4 5px 10px); color: #cbd5e1; font-size: 9px; }
+  table.ts td.todaycol { box-shadow: inset 0 0 0 2px #3b82f6; }
+  table.ts thead th.todaycol { box-shadow: inset 0 0 0 2px #3b82f6; color: #2563eb; }
+
+  /* ===== Compteurs ===== */
+  table.counters { border-collapse: collapse; }
+  table.counters th, table.counters td { border: 1px solid #e2e8f0; padding: 5px 12px; font-size: 12px; text-align: center; }
+  table.counters thead th { background: #f8fafc; font-weight: 800; color: #475569; font-size: 11px; }
+  table.counters td.name { text-align: left; font-weight: 800; border-left: 3px solid var(--c, #94a3b8); white-space: nowrap; }
+  table.counters td.num { font-weight: 800; }
+  table.counters td.greyed { background: repeating-linear-gradient(135deg, #f1f5f9 0 5px, #e9eef4 5px 10px); color: #cbd5e1; }
+
+  .legend-chip { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 700; }
+  .legend-box { width: 22px; height: 16px; border-radius: 4px; display: inline-flex; align-items: center; justify-content: center; font-size: 9px; font-weight: 900; border: 1px solid rgba(0,0,0,.06); }
+
+  *::-webkit-scrollbar { height: 9px; width: 9px; }
+  *::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 6px; }
+
+  /* ===== Lock ===== */
+  .lock-overlay { position: fixed; inset: 0; background: linear-gradient(135deg, #0f172a, #1e293b 50%, #312e81); z-index: 9999; display: flex; align-items: center; justify-content: center; padding: 20px; }
+  .lock-card { background: white; border-radius: 24px; padding: 36px 32px; max-width: 380px; width: 100%; box-shadow: 0 24px 64px rgba(0,0,0,.4); text-align: center; }
+  .lock-input { width: 100%; padding: 12px 16px; border-radius: 12px; border: 2px solid #e2e8f0; font-size: 16px; font-weight: 600; outline: none; font-family: inherit; }
+  .lock-input:focus { border-color: #3b82f6; }
+  .lock-btn { width: 100%; padding: 12px; background: linear-gradient(135deg, #3b82f6, #6366f1); color: white; font-weight: 800; border-radius: 12px; border: none; font-size: 15px; cursor: pointer; margin-top: 12px; }
+  .lock-error { color: #ef4444; font-size: 13px; font-weight: 600; margin-top: 8px; min-height: 18px; }
+
+  /* ===== Impression PDF paysage ===== */
+  @media print {
+    @page { size: A4 landscape; margin: 7mm; }
+    html, body { background: white; }
+    .no-print { display: none !important; }
+    .sheet { box-shadow: none; border-radius: 0; padding: 0; }
+    .ts-wrap { overflow: visible !important; }
+    table.ts td.name, table.ts th.name { position: static; }
+    * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Lock screen -->
+<div id="lock-screen" class="lock-overlay">
+  <div class="lock-card">
+    <div class="w-14 h-14 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-indigo-500 via-blue-500 to-cyan-500 flex items-center justify-center text-white text-2xl shadow-lg shadow-blue-500/30">🔒</div>
+    <h1 class="text-xl font-extrabold mb-1">Pointage RH</h1>
+    <p class="text-sm text-slate-500 mb-2">Accès protégé</p>
+    <form id="lock-form">
+      <input id="lock-input" type="password" class="lock-input" placeholder="Mot de passe" autocomplete="current-password" autofocus />
+      <button type="submit" class="lock-btn">Déverrouiller</button>
+      <div id="lock-error" class="lock-error"></div>
+    </form>
+  </div>
+</div>
+
+<div class="max-w-[1500px] mx-auto px-3 md:px-6 py-4 md:py-6">
+
+  <!-- Header / contrôles -->
+  <header class="glass rounded-2xl px-4 md:px-6 py-3 flex flex-wrap items-center justify-between gap-3 mb-5 no-print">
+    <div class="flex items-center gap-3">
+      <div class="w-11 h-11 rounded-xl bg-gradient-to-br from-slate-700 to-slate-900 flex items-center justify-center text-white text-xl shadow">🗂️</div>
+      <div>
+        <h1 class="text-base md:text-lg font-extrabold leading-tight">Pointage RH</h1>
+        <p class="text-xs text-slate-500 leading-tight">Récap mensuel · TB3 & TB4</p>
+      </div>
+    </div>
+    <div class="flex items-center gap-2 flex-wrap">
+      <div class="flex items-center gap-1.5 mr-1">
+        <button id="prev-btn" class="w-9 h-9 rounded-lg bg-white border border-slate-200 hover:bg-slate-50 flex items-center justify-center" aria-label="Mois précédent">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15 19l-7-7 7-7"/></svg>
+        </button>
+        <span id="period-label" class="text-base font-extrabold capitalize min-w-[130px] text-center"></span>
+        <button id="next-btn" class="w-9 h-9 rounded-lg bg-white border border-slate-200 hover:bg-slate-50 flex items-center justify-center" aria-label="Mois suivant">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"/></svg>
+        </button>
+      </div>
+      <button id="pdf-btn" class="px-4 py-2 rounded-lg bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white text-sm font-bold flex items-center gap-2 shadow-sm">📄 Télécharger en PDF</button>
+      <a href="index.html" class="px-3 py-2 rounded-lg bg-white border border-slate-200 hover:bg-slate-50 text-sm font-semibold flex items-center gap-1.5">📅 Planning</a>
+    </div>
+  </header>
+
+  <!-- Feuille imprimable -->
+  <div class="sheet">
+    <div class="flex items-end justify-between mb-3 gap-3 flex-wrap">
+      <div>
+        <div class="sheet-title">Feuille de pointage — <span id="sheet-month"></span></div>
+        <div class="sheet-sub">TB3 &amp; TB4 · Concierges &amp; renforts</div>
+      </div>
+      <div id="legend" class="flex flex-wrap gap-x-3 gap-y-1 justify-end"></div>
+    </div>
+
+    <div class="ts-wrap" style="overflow-x:auto;">
+      <table class="ts" id="ts-table"></table>
+    </div>
+
+    <div class="mt-5 flex flex-wrap gap-6 items-start">
+      <div>
+        <div class="text-xs font-extrabold uppercase tracking-wider text-slate-500 mb-2">Compteurs</div>
+        <table class="counters" id="counters-table"></table>
+        <div class="text-[10px] text-slate-400 mt-1">CP / RTT = jours posés sur l'année 2026 · H. supp = total du mois affiché.</div>
+      </div>
+    </div>
+  </div>
+
+  <footer class="mt-6 text-center text-xs text-slate-400 no-print">
+    Données partagées avec le planning · Pour modifier les pointages, voir avec l'admin (data.js).
+  </footer>
+</div>
+
+<script src="data.js"></script>
+<script>
+setupGate();
+
+// ----- Codes de pointage -----
+const CODE_STYLE = {
+  P:   { bg: '#dcfce7', fg: '#166534' },
+  CP:  { bg: '#dbeafe', fg: '#1e40af' },
+  RTT: { bg: '#ede9fe', fg: '#6d28d9' },
+  AM:  { bg: '#ffedd5', fg: '#9a3412' },
+  ABI: { bg: '#fee2e2', fg: '#991b1b' },
+  CS:  { bg: '#e2e8f0', fg: '#334155' },
+};
+const CODE_ORDER = ['P','CP','RTT','AM','ABI','CS'];
+
+// ----- State -----
+let currentMonth, currentYear;
+if (today.getFullYear() === 2026) { currentMonth = today.getMonth(); currentYear = 2026; }
+else { currentMonth = 5; currentYear = 2026; }
+if (currentYear < MIN_Y || (currentYear === MIN_Y && currentMonth < MIN_M)) { currentYear = MIN_Y; currentMonth = MIN_M; }
+function atMin() { return currentYear === MIN_Y && currentMonth <= MIN_M; }
+
+const PEOPLE = Object.keys(COLLABORATORS);
+const WD_INITIAL = ['D','L','M','M','J','V','S'];
+
+// ----- Statut d'un jour -----
+function dayCode(person, dateStr) {
+  const d = parseD(dateStr);
+  const dow = d.getDay();
+  if (dow === 0 || dow === 6) return { off: 'we' };
+  if (isHoliday(d)) return { off: 'hol', label: isHoliday(d) };
+  return { code: absenceType(person, dateStr) || 'P' };
+}
+
+// ----- Comptage -----
+function countType(person, type, month) { // month=null => année entière
+  const a = ABSENCES[person] || {};
+  let n = 0;
+  for (const ds in a) {
+    if (a[ds] !== type) continue;
+    const d = parseD(ds);
+    if (d.getFullYear() !== 2026) continue;
+    if (month != null && d.getMonth() !== month) continue;
+    n++;
+  }
+  return n;
+}
+function sumExtra(person, month) {
+  let h = 0;
+  for (const ds in EXTRA_HOURS) {
+    const d = parseD(ds);
+    if (d.getFullYear() !== currentYear) continue;
+    if (month != null && d.getMonth() !== month) continue;
+    for (const e of EXTRA_HOURS[ds]) if (e.person === person) h += (e.hours || 0);
+  }
+  return h;
+}
+
+// ----- Rendu -----
+function render() {
+  document.getElementById('period-label').textContent = `${MONTHS_FR[currentMonth]} ${currentYear}`;
+  document.getElementById('sheet-month').textContent = `${MONTHS_FR[currentMonth]} ${currentYear}`;
+  document.getElementById('prev-btn').style.visibility = atMin() ? 'hidden' : 'visible';
+  renderTable();
+  renderCounters();
+  renderLegend();
+}
+
+function renderTable() {
+  const nbDays = new Date(currentYear, currentMonth + 1, 0).getDate();
+  const colW = (100 / (nbDays + 0.001)).toFixed(3); // jours; nom = largeur fixe via CSS
+
+  // En-tête
+  let head = '<colgroup><col style="width:92px">';
+  for (let i = 1; i <= nbDays; i++) head += `<col>`;
+  head += '</colgroup>';
+  head += '<thead><tr><th class="name">Collaborateur</th>';
+  for (let i = 1; i <= nbDays; i++) {
+    const d = new Date(currentYear, currentMonth, i);
+    const dow = d.getDay();
+    const we = (dow === 0 || dow === 6);
+    const isToday = fmt(d) === todayStr;
+    head += `<th class="${we ? 'we' : ''} ${isToday ? 'todaycol' : ''}"><span class="wd">${WD_INITIAL[dow]}</span>${i}</th>`;
+  }
+  head += '</tr></thead>';
+
+  // Corps
+  let body = '<tbody>';
+  for (const p of PEOPLE) {
+    const c = COLOR_HEX[COLLABORATORS[p].color];
+    body += `<tr><td class="name" style="--c:${c}">${COLLABORATORS[p].shortName}</td>`;
+    for (let i = 1; i <= nbDays; i++) {
+      const d = new Date(currentYear, currentMonth, i);
+      const ds = fmt(d);
+      const isToday = ds === todayStr;
+      const st = dayCode(p, ds);
+      if (st.off) {
+        body += `<td class="c off ${isToday ? 'todaycol' : ''}" title="${st.label || 'Weekend'}">${st.off === 'hol' ? 'F' : ''}</td>`;
+      } else {
+        const code = st.code;
+        const sty = CODE_STYLE[code] || CODE_STYLE.P;
+        const ex = personExtra(p, ds);
+        const ot = ex ? `<span class="ot">+${ex.hours}h</span>` : '';
+        body += `<td class="c ${isToday ? 'todaycol' : ''}" style="background:${sty.bg};color:${sty.fg}"><span class="cd">${code}</span>${ot}</td>`;
+      }
+    }
+    body += '</tr>';
+  }
+  body += '</tbody>';
+  document.getElementById('ts-table').innerHTML = head + body;
+}
+
+function renderCounters() {
+  let html = '<thead><tr><th class="name" style="text-align:left">Collaborateur</th>'
+    + '<th>CP mois</th><th>CP 2026</th><th>RTT mois</th><th>RTT 2026</th><th>H. supp mois</th></tr></thead><tbody>';
+  for (const p of PEOPLE) {
+    const c = COLOR_HEX[COLLABORATORS[p].color];
+    const canRtt = !!COLLABORATORS[p].rtt;
+    const cpM = countType(p, 'CP', currentMonth);
+    const cpY = countType(p, 'CP', null);
+    const rttM = countType(p, 'RTT', currentMonth);
+    const rttY = countType(p, 'RTT', null);
+    const ot = sumExtra(p, currentMonth);
+    html += `<tr><td class="name" style="--c:${c}">${COLLABORATORS[p].shortName}</td>`;
+    html += `<td class="num">${cpM || '0'}</td><td class="num">${cpY || '0'}</td>`;
+    if (canRtt) {
+      html += `<td class="num">${rttM || '0'}</td><td class="num">${rttY || '0'}</td>`;
+    } else {
+      html += `<td class="greyed">—</td><td class="greyed">—</td>`;
+    }
+    html += `<td class="num">${ot ? '+' + ot + 'h' : '—'}</td></tr>`;
+  }
+  html += '</tbody>';
+  document.getElementById('counters-table').innerHTML = html;
+}
+
+function renderLegend() {
+  let html = '';
+  for (const code of CODE_ORDER) {
+    const s = CODE_STYLE[code];
+    html += `<span class="legend-chip"><span class="legend-box" style="background:${s.bg};color:${s.fg}">${code}</span>${POINTAGE_LABELS[code]}</span>`;
+  }
+  html += `<span class="legend-chip"><span class="legend-box" style="background:#fff;color:#b45309;border-color:#fcd34d">+h</span>Heures supp.</span>`;
+  html += `<span class="legend-chip"><span class="legend-box" style="background:repeating-linear-gradient(135deg,#f1f5f9 0 4px,#e9eef4 4px 8px)"></span>Week-end / Férié (F)</span>`;
+  document.getElementById('legend').innerHTML = html;
+}
+
+// ----- Navigation -----
+function prevMonth() { if (atMin()) return; if (--currentMonth < 0) { currentMonth = 11; currentYear--; } render(); }
+function nextMonth() { if (++currentMonth > 11) { currentMonth = 0; currentYear++; } render(); }
+document.getElementById('prev-btn').addEventListener('click', prevMonth);
+document.getElementById('next-btn').addEventListener('click', nextMonth);
+document.getElementById('pdf-btn').addEventListener('click', () => window.print());
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'ArrowLeft') prevMonth();
+  if (e.key === 'ArrowRight') nextMonth();
+});
+
+render();
+</script>
+</body>
+</html>

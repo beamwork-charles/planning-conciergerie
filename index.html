@@ -237,6 +237,7 @@
       <button id="leave-btn" class="px-4 py-2 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-sm font-bold flex items-center gap-2 shadow-sm transition">
         <span>🌴</span> Demande de congé
       </button>
+      <a href="rh.html" class="px-3 py-2 rounded-lg bg-white border border-slate-200 hover:bg-slate-50 text-sm font-semibold flex items-center gap-1.5">🗂️ Pointage RH</a>
     </div>
   </header>
 
@@ -268,158 +269,24 @@
   </div>
 </div>
 
+<script src="data.js"></script>
 <script>
 /* ============================================================
    Planning Conciergerie · TB3 & TB4 — affichage en lecture seule
+   Données + helpers partagés : voir data.js
    ============================================================ */
 
-// ============================================================
-// PASSWORD GATE (protection légère côté front)
-// Mot de passe : THEBUREAU
-// Pour le changer : générer le SHA-256 du nouveau mot de passe
-//   (console : crypto.subtle.digest ...) et remplacer PWD_HASH.
-// ============================================================
-const PWD_HASH = 'f2fc97cfa4baa8682a96ef023913fb10ab7eb5fd7ee1d5ded2fabfb9c0b849d0';
-const PWD_KEY = 'planning-auth-v1';
+// Accès protégé + données + helpers : voir data.js
+setupGate();
 
-async function sha256Hex(text) {
-  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
-  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
-}
-(function gateInit() {
-  const lock = document.getElementById('lock-screen');
-  if (sessionStorage.getItem(PWD_KEY) === '1') { lock.remove(); return; }
-  document.getElementById('lock-form').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const input = document.getElementById('lock-input');
-    const err = document.getElementById('lock-error');
-    err.textContent = '';
-    const h = await sha256Hex(input.value);
-    if (h === PWD_HASH) {
-      sessionStorage.setItem(PWD_KEY, '1');
-      lock.style.transition = 'opacity .25s ease'; lock.style.opacity = '0';
-      setTimeout(() => lock.remove(), 250);
-    } else {
-      err.textContent = 'Mot de passe incorrect';
-      input.value = ''; input.focus();
-      lock.querySelector('.lock-card').animate(
-        [{ transform: 'translateX(0)' }, { transform: 'translateX(-8px)' }, { transform: 'translateX(8px)' }, { transform: 'translateX(0)' }],
-        { duration: 250 });
-    }
-  });
-})();
-
-// ============================================================
-// DONNÉES — gérées dans ce fichier (modifiées via Claude)
-// ============================================================
-const COLLABORATORS = {
-  Emilie:  { building: 'TB3', color: 'emilie',  role: 'concierge', shortName: 'Émilie' },
-  Flora:   { building: 'TB3', color: 'flora',   role: 'concierge', shortName: 'Flora' },
-  Cédric:  { building: 'TB4', color: 'cedric',  role: 'concierge', shortName: 'Cédric' },
-  Chiara:  { building: 'TB4', color: 'chiara',  role: 'concierge', shortName: 'Chiara' },
-  Dynah:   { building: null,  color: 'dynah',   role: 'renfort',   shortName: 'Dynah' },
-  Charles: { building: null,  color: 'charles', role: 'renfort',   shortName: 'Charles' },
-};
-const PARTNER = { Emilie: 'Flora', Flora: 'Emilie', Cédric: 'Chiara', Chiara: 'Cédric' };
-const BUILDING_CONCIERGES = { TB3: ['Emilie', 'Flora'], TB4: ['Cédric', 'Chiara'] };
-
-const COLOR_HEX = {
-  emilie: '#ec4899', flora: '#a855f7', chiara: '#14b8a6',
-  cedric: '#3b82f6', dynah: '#f59e0b', charles: '#10b981', none: '#94a3b8'
-};
-
-// Semaine de référence 08-14/06/2026 → Flora & Cédric matin, Émilie & Chiara soir
-const REF_MONDAY    = new Date(2026, 5, 8);
-const REDUCED_START = new Date(2026, 6, 13);   // 13/07/2026
-const REDUCED_END   = new Date(2026, 7, 28);   // 28/08/2026
-
-// Absences (CP) — éditées directement ici
-const ABSENCES = {
-  Emilie:  ['2026-06-12', '2026-07-13'],
-  Flora:   ['2026-08-10','2026-08-11','2026-08-12','2026-08-13','2026-08-14'],
-  Chiara:  ['2026-09-07','2026-09-08','2026-09-09','2026-09-10'],
-  Cédric:  [],
-  Dynah:   [
-    '2026-07-13',
-    '2026-07-27','2026-07-28','2026-07-29','2026-07-30','2026-07-31',
-    '2026-08-01','2026-08-02','2026-08-03','2026-08-04','2026-08-05','2026-08-06','2026-08-07',
-    '2026-09-09','2026-09-10','2026-09-11',
-    '2026-09-21'
-  ],
-  Charles: ['2026-06-15','2026-06-16','2026-06-17','2026-06-18','2026-06-19']
-};
-
-// Heures supplémentaires — { 'AAAA-MM-JJ': [ { person, label, hours } ] }
-const EXTRA_HOURS = {
-  '2026-06-24': [ { person: 'Emilie', label: '19h–22h', hours: 3 } ]
-};
-
-// Exceptions manuelles par date — écrasent l'affectation auto (après calcul des remplacements)
-// Format : { 'AAAA-MM-JJ': { TB3|TB4: { morning|evening: { person, substituteFor } } } }
-const OVERRIDES = {
-  // 12/06 : exception — Dynah ne peut pas faire le soir. Flora prend le soir (remplace Émilie),
-  // et Dynah ouvre le matin (à la place de Flora).
-  '2026-06-12': {
-    TB3: {
-      morning: { person: 'Dynah', substituteFor: 'Flora' },
-      evening: { person: 'Flora', substituteFor: 'Emilie' }
-    }
-  }
-};
-
-const HOLIDAYS_2026 = {
-  '2026-01-01': "Jour de l'An", '2026-04-06': 'Lundi de Pâques', '2026-05-01': 'Fête du Travail',
-  '2026-05-08': 'Victoire 1945', '2026-05-14': 'Ascension', '2026-05-25': 'Lundi de Pentecôte',
-  '2026-07-14': 'Fête nationale', '2026-08-15': 'Assomption', '2026-11-01': 'Toussaint',
-  '2026-11-11': 'Armistice', '2026-12-25': 'Noël'
-};
-
-const MONTHS_FR = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
-const DAYS_FR   = ['Dimanche','Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi'];
-
-// ----- State -----
+// ----- State (today / MIN_Y / MIN_M : voir data.js) -----
 let currentMonth, currentYear;
-const today = new Date(); today.setHours(0,0,0,0);
 if (today.getFullYear() === 2026) { currentMonth = today.getMonth(); currentYear = 2026; }
 else { currentMonth = 5; currentYear = 2026; }
-// Juin 2026 = premier mois visible — rien avant n'est accessible
-const MIN_Y = 2026, MIN_M = 5;
 if (currentYear < MIN_Y || (currentYear === MIN_Y && currentMonth < MIN_M)) { currentYear = MIN_Y; currentMonth = MIN_M; }
 function atMin() { return currentYear === MIN_Y && currentMonth <= MIN_M; }
 
-// ----- Date helpers -----
-const pad = n => String(n).padStart(2, '0');
-const fmt = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
-const parseD = s => { const [y,m,d] = s.split('-').map(Number); return new Date(y, m-1, d); };
-const fmtFR = s => { const d = parseD(s); return `${pad(d.getDate())}/${pad(d.getMonth()+1)}/${d.getFullYear()}`; };
-function daysBetween(a, b) { return Math.round((b - a) / 86400000); }
-function range(startStr, endStr) {
-  const a = parseD(startStr), b = parseD(endStr), out = [];
-  for (let d = new Date(a); d <= b; d.setDate(d.getDate()+1)) out.push(fmt(d));
-  return out;
-}
-function isHoliday(d) { return HOLIDAYS_2026[fmt(d)]; }
-function isWorkday(d) { const w = d.getDay(); return w !== 0 && w !== 6 && !isHoliday(d); }
-// Jour de pont : vendredi après un jeudi férié, ou lundi avant un mardi férié
-function isBridgeDay(d) {
-  if (!isWorkday(d)) return false;
-  const dow = d.getDay();
-  if (dow === 5) { const p = new Date(d); p.setDate(p.getDate()-1); if (isHoliday(p)) return true; }
-  if (dow === 1) { const n = new Date(d); n.setDate(n.getDate()+1); if (isHoliday(n)) return true; }
-  return false;
-}
-// Horaires réduits : période 13/07–28/08 OU jour de pont
-function isReducedDay(d) { return (d >= REDUCED_START && d <= REDUCED_END) || isBridgeDay(d); }
-function getWeekParity(d) {
-  const monday = new Date(d);
-  monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7));
-  const w = Math.floor(daysBetween(REF_MONDAY, monday) / 7);
-  return ((w % 2) + 2) % 2;
-}
-const SN = p => COLLABORATORS[p]?.shortName || p;
-function isAbsent(person, dateStr) { return (ABSENCES[person] || []).includes(dateStr); }
-
-// ----- Schedule generation -----
+// ----- Schedule generation (helpers de dates : voir data.js) -----
 function genDay(date) {
   const dateStr = fmt(date);
   const dow = date.getDay();
@@ -633,7 +500,7 @@ function renderExtraHours(dateStr, building) {
 // ============================================================
 const LEAVE_TO = 'charles@thebureau.paris';
 let leavePeriods = [{ start: '', end: '' }];
-const todayStr = fmt(today);
+// todayStr : voir data.js
 
 function openLeaveModal(preset) {
   leavePeriods = [{ start: '', end: '' }];
