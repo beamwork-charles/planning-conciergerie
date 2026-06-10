@@ -61,6 +61,7 @@
   .day-cell.today { border: 2px solid #3b82f6; box-shadow: 0 0 0 4px rgba(59,130,246,.12); }
   .day-cell.reduced { background: linear-gradient(180deg, #fffbeb 0%, #fef3c7 100%); }
   .day-cell.holiday { background: linear-gradient(180deg, #fef2f2 0%, #fee2e2 100%); }
+  .day-cell.past { filter: grayscale(0.65); opacity: 0.6; }
   .day-number { font-size: 18px; font-weight: 800; color: #0f172a; line-height: 1; }
   .day-cell.today .day-number { color: #2563eb; }
 
@@ -353,6 +354,19 @@ const EXTRA_HOURS = {
   '2026-06-24': [ { person: 'Emilie', label: '19h–22h', hours: 3 } ]
 };
 
+// Exceptions manuelles par date — écrasent l'affectation auto (après calcul des remplacements)
+// Format : { 'AAAA-MM-JJ': { TB3|TB4: { morning|evening: { person, substituteFor } } } }
+const OVERRIDES = {
+  // 12/06 : exception — Dynah ne peut pas faire le soir. Flora prend le soir (remplace Émilie),
+  // et Dynah ouvre le matin (à la place de Flora).
+  '2026-06-12': {
+    TB3: {
+      morning: { person: 'Dynah', substituteFor: 'Flora' },
+      evening: { person: 'Flora', substituteFor: 'Emilie' }
+    }
+  }
+};
+
 const HOLIDAYS_2026 = {
   '2026-01-01': "Jour de l'An", '2026-04-06': 'Lundi de Pâques', '2026-05-01': 'Fête du Travail',
   '2026-05-08': 'Victoire 1945', '2026-05-14': 'Ascension', '2026-05-25': 'Lundi de Pentecôte',
@@ -438,12 +452,34 @@ function genDay(date) {
   const absentToday = new Set();
   for (const p of Object.keys(COLLABORATORS)) if (isAbsent(p, dateStr)) absentToday.add(p);
   applySubs(schedule, absentToday);
+  applyOverrides(schedule, dateStr);
   schedule.dynah   = computeStatus('Dynah', schedule, absentToday);
   schedule.charles = computeStatus('Charles', schedule, absentToday);
   schedule.warnings = collectWarnings(schedule);
   return schedule;
 }
 function mkShift(time, person) { return { time, person, defaultPerson: person, swapped: false, substituteFor: null }; }
+function applyOverrides(schedule, dateStr) {
+  const ov = OVERRIDES[dateStr];
+  if (!ov) return;
+  for (const b of ['TB3','TB4']) {
+    if (!ov[b]) continue;
+    for (const slot of ['morning','evening']) {
+      const o = ov[b][slot];
+      if (o && schedule[b][slot]) {
+        schedule[b][slot].person = o.person ?? null;
+        schedule[b][slot].substituteFor = o.substituteFor ?? null;
+      }
+    }
+    if (ov[b].slots && schedule[b].slots) {
+      schedule[b].slots = ov[b].slots.map(o => {
+        const sh = mkShift('9h-18h', o.person ?? null);
+        sh.substituteFor = o.substituteFor ?? null;
+        return sh;
+      });
+    }
+  }
+}
 
 function applySubs(schedule, absentToday) {
   // Un renfort ne peut couvrir qu'un seul shift par jour → on suit ceux déjà placés
@@ -545,6 +581,7 @@ function renderDayCell(date, isCurrent, isToday) {
   if (!isCurrent) cls.push('other-month');
   if (isToday) cls.push('today');
   if (sch.reduced) cls.push('reduced');
+  if (date.getTime() < today.getTime()) cls.push('past');
 
   let html = `<div class="${cls.join(' ')}">`;
   if (sch.warnings && sch.warnings.length) html += `<div class="warning-flag" title="${sch.warnings.join(' · ')}">!</div>`;
