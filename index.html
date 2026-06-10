@@ -671,9 +671,10 @@ function openLeaveModal(preset) {
         <textarea id="leave-msg" rows="2" class="leave-input" placeholder="Précision éventuelle…"></textarea>
       </div>
       <div id="leave-preview"></div>
-      <div class="flex justify-end gap-2 pt-1">
-        <button onclick="closeModal('leave-modal')" class="px-4 py-2 rounded-lg bg-white border border-slate-200 hover:bg-slate-50 text-sm font-semibold">Annuler</button>
-        <button id="leave-send" class="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold flex items-center gap-2">📧 Préparer l'email</button>
+      <div class="space-y-2 pt-1">
+        <button id="leave-gmail" class="w-full px-4 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold flex items-center justify-center gap-2">📧 Ouvrir dans Gmail</button>
+        <button id="leave-copy" class="w-full px-4 py-2 rounded-lg bg-white border border-slate-200 hover:bg-slate-50 text-sm font-semibold flex items-center justify-center gap-2">📋 Copier le message</button>
+        <div class="text-center pt-1"><button id="leave-mailto" class="text-xs font-semibold text-slate-400 hover:text-slate-600 underline">ou ouvrir dans votre application mail</button></div>
       </div>
     </div>`;
   document.getElementById('leave-modal-content').innerHTML = html;
@@ -700,7 +701,9 @@ function openLeaveModal(preset) {
       renderLeaveRows(); updateLeavePreview();
     }
   });
-  document.getElementById('leave-send').addEventListener('click', buildLeaveEmail);
+  document.getElementById('leave-gmail').addEventListener('click', openGmail);
+  document.getElementById('leave-copy').addEventListener('click', (ev) => copyLeaveContent(ev.currentTarget));
+  document.getElementById('leave-mailto').addEventListener('click', openMailto);
   if (preset) document.getElementById('leave-person').value = preset;
   updateLeavePreview();
   document.getElementById('leave-modal').classList.remove('hidden');
@@ -768,13 +771,13 @@ function updateLeavePreview() {
   }
   return box.innerHTML = html + `</div>`;
 }
-function buildLeaveEmail() {
+function getLeaveEmail() {
   syncLeaveFromDOM();
   const requester = document.getElementById('leave-person').value;
   const name = COLLABORATORS[requester].shortName;
   const msg = document.getElementById('leave-msg').value.trim();
   const dates = collectDates(leavePeriods);
-  if (!dates.length) { alert('Indiquez au moins une date.'); return; }
+  if (!dates.length) { alert('Indiquez au moins une date.'); return null; }
   const working = dates.filter(d => isWorkday(parseD(d))).length;
   const periodLines = leavePeriods.filter(p => p.start).map(p => {
     const end = (p.end && p.end >= p.start) ? p.end : p.start;
@@ -788,8 +791,38 @@ function buildLeaveEmail() {
   }
   if (msg) body += `\nMessage : ${msg}\n`;
   body += `\nBien cordialement,\n${name}`;
-  const subject = `Demande de congés — ${name}`;
-  window.location.href = `mailto:${LEAVE_TO}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  return { to: LEAVE_TO, subject: `Demande de congés — ${name}`, body };
+}
+
+function openGmail() {
+  const e = getLeaveEmail(); if (!e) return;
+  const url = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(e.to)}&su=${encodeURIComponent(e.subject)}&body=${encodeURIComponent(e.body)}`;
+  window.open(url, '_blank', 'noopener');
+}
+
+function openMailto() {
+  const e = getLeaveEmail(); if (!e) return;
+  window.location.href = `mailto:${e.to}?subject=${encodeURIComponent(e.subject)}&body=${encodeURIComponent(e.body)}`;
+}
+
+async function copyLeaveContent(btn) {
+  const e = getLeaveEmail(); if (!e) return;
+  const text = `À : ${e.to}\nObjet : ${e.subject}\n\n${e.body}`;
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(text);
+    } else {
+      const ta = document.createElement('textarea');
+      ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+      document.body.appendChild(ta); ta.focus(); ta.select();
+      document.execCommand('copy'); document.body.removeChild(ta);
+    }
+    const old = btn.innerHTML;
+    btn.innerHTML = '✓ Message copié !'; btn.style.color = '#059669'; btn.style.borderColor = '#a7f3d0';
+    setTimeout(() => { btn.innerHTML = old; btn.style.color = ''; btn.style.borderColor = ''; }, 2000);
+  } catch (err) {
+    alert('Copie automatique impossible sur ce navigateur — sélectionnez puis copiez le message manuellement.');
+  }
 }
 
 function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
