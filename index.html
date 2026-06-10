@@ -446,14 +446,21 @@ function genDay(date) {
 function mkShift(time, person) { return { time, person, defaultPerson: person, swapped: false, substituteFor: null }; }
 
 function applySubs(schedule, absentToday) {
+  // Un renfort ne peut couvrir qu'un seul shift par jour → on suit ceux déjà placés
+  const usedRenforts = new Set();
+  const pickRenfort = () => {
+    for (const r of ['Dynah', 'Charles']) {
+      if (!absentToday.has(r) && !usedRenforts.has(r)) { usedRenforts.add(r); return r; }
+    }
+    return null;
+  };
   if (schedule.reduced) {
     for (const b of ['TB3','TB4']) {
       const blk = schedule[b];
       const present = blk.slots.filter(s => !absentToday.has(s.person));
       if (present.length === 0) {
         // Les 2 concierges absents → un renfort assure le 9h-18h
-        const sub = findSub(absentToday);
-        const slot = mkShift('9h-18h', sub);
+        const slot = mkShift('9h-18h', pickRenfort());
         slot.substituteFor = blk.slots[0].person;
         blk.slots = [slot];
       } else {
@@ -462,32 +469,18 @@ function applySubs(schedule, absentToday) {
       }
     }
   } else {
+    // Règle simple : le renfort prend directement le shift de l'absent, l'autre concierge ne bouge pas
     for (const b of ['TB3','TB4']) {
       const blk = schedule[b];
-      const mAbsent = absentToday.has(blk.morning.person);
-      const eAbsent = absentToday.has(blk.evening.person);
-      if (mAbsent && eAbsent) {
-        const taken = new Set(absentToday);
-        const sub1 = findSub(taken); if (sub1) taken.add(sub1);
-        const sub2 = findSub(taken);
-        blk.morning.substituteFor = blk.morning.person; blk.morning.person = sub1 || null;
-        blk.evening.substituteFor = blk.evening.person; blk.evening.person = sub2 || null;
-      } else if (mAbsent) {
-        const originalMorning = blk.morning.person, partner = blk.evening.person, sub = findSub(absentToday);
-        blk.morning.substituteFor = originalMorning; blk.morning.person = partner; blk.morning.swapped = true;
-        blk.evening.substituteFor = partner; blk.evening.person = sub || null;
-      } else if (eAbsent) {
-        const originalEvening = blk.evening.person, partner = blk.morning.person, sub = findSub(absentToday);
-        blk.evening.substituteFor = originalEvening; blk.evening.person = partner; blk.evening.swapped = true;
-        blk.morning.substituteFor = partner; blk.morning.person = sub || null;
+      for (const slot of ['morning', 'evening']) {
+        const s = blk[slot];
+        if (absentToday.has(s.person)) {
+          s.substituteFor = s.person;
+          s.person = pickRenfort();
+        }
       }
     }
   }
-}
-function findSub(absentSet) {
-  if (!absentSet.has('Dynah')) return 'Dynah';
-  if (!absentSet.has('Charles')) return 'Charles';
-  return null;
 }
 function computeStatus(person, schedule, absentToday) {
   if (absentToday.has(person)) return 'cp';
