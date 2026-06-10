@@ -8,6 +8,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 <style>
   * { box-sizing: border-box; }
   html, body {
@@ -321,12 +323,89 @@ function renderLegend() {
   document.getElementById('legend').innerHTML = html;
 }
 
+// ----- Export PDF (téléchargement direct, paysage 1 page) -----
+function hexRgb(h) { h = h.replace('#', ''); return [parseInt(h.slice(0,2),16), parseInt(h.slice(2,4),16), parseInt(h.slice(4,6),16)]; }
+function downloadPDF() {
+  if (!window.jspdf || !window.jspdf.jsPDF) { window.print(); return; } // repli si lib indisponible
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(13);
+  doc.text(`Feuille de pointage - ${MONTHS_FR[currentMonth]} ${currentYear}`, 8, 10);
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(120);
+  doc.text('TB3 & TB4 · Concierges & renforts', 8, 14.5);
+  doc.setTextColor(0);
+
+  // Grille de pointage
+  const nbDays = new Date(currentYear, currentMonth + 1, 0).getDate();
+  const head = [['Collaborateur']];
+  for (let i = 1; i <= nbDays; i++) { const d = new Date(currentYear, currentMonth, i); head[0].push(`${WD_INITIAL[d.getDay()]}\n${i}`); }
+  const body = PEOPLE.map(p => {
+    const row = [{ content: COLLABORATORS[p].shortName, styles: { halign: 'left', fontStyle: 'bold' } }];
+    for (let i = 1; i <= nbDays; i++) {
+      const d = new Date(currentYear, currentMonth, i), ds = fmt(d), dow = d.getDay();
+      if (dow === 0 || dow === 6 || isHoliday(d)) {
+        row.push({ content: isHoliday(d) ? 'F' : '', styles: { fillColor: [233,238,244], textColor: [170,180,190] } });
+      } else {
+        const code = absenceType(p, ds) || 'P';
+        const sty = CODE_STYLE[code] || CODE_STYLE.P;
+        const ex = personExtra(p, ds);
+        row.push({ content: ex ? `${code}\n+${ex.hours}h` : code, styles: { fillColor: hexRgb(sty.bg), textColor: hexRgb(sty.fg), fontStyle: 'bold' } });
+      }
+    }
+    return row;
+  });
+  doc.autoTable({
+    head, body, startY: 18, theme: 'grid',
+    styles: { fontSize: 5.7, cellPadding: 0.5, halign: 'center', valign: 'middle', lineColor: [226,232,240], lineWidth: 0.1, overflow: 'linebreak' },
+    headStyles: { fillColor: [248,250,252], textColor: [71,85,105], fontStyle: 'bold' },
+    columnStyles: { 0: { cellWidth: 24, halign: 'left', fontStyle: 'bold' } },
+    margin: { left: 8, right: 8 },
+  });
+
+  // Compteurs
+  const cHead = [['Collaborateur','CP acquis','CP pris','CP solde','RTT acquis','RTT pris','RTT solde','H. supp mois']];
+  const grey = { fillColor: [241,245,249], textColor: [170,180,190] };
+  const cBody = PEOPLE.map(p => {
+    const canRtt = !!COLLABORATORS[p].rtt;
+    const cpAcq = cpAcquired(p, currentYear, currentMonth);
+    const cpTaken = countTypeUpTo(p, 'CP', currentYear, currentMonth);
+    const cpSolde = cpAcq - cpTaken;
+    const ot = sumExtra(p, currentMonth);
+    const row = [
+      { content: COLLABORATORS[p].shortName, styles: { halign: 'left', fontStyle: 'bold' } },
+      fmtNum(cpAcq), fmtNum(cpTaken),
+      { content: fmtNum(cpSolde), styles: { fontStyle: 'bold', textColor: cpSolde < 0 ? [220,38,38] : [22,101,52] } },
+    ];
+    if (canRtt) {
+      const ra = (RTT_ANNUAL[p] || 0), rt = countTypeUpTo(p, 'RTT', currentYear, currentMonth), rs = ra - rt;
+      row.push(fmtNum(ra), fmtNum(rt), { content: fmtNum(rs), styles: { fontStyle: 'bold', textColor: rs < 0 ? [220,38,38] : [109,40,217] } });
+    } else {
+      row.push({ content: '-', styles: grey }, { content: '-', styles: grey }, { content: '-', styles: grey });
+    }
+    row.push(ot ? `+${ot}h` : '-');
+    return row;
+  });
+  doc.autoTable({
+    head: cHead, body: cBody, startY: doc.lastAutoTable.finalY + 6, theme: 'grid',
+    styles: { fontSize: 8, cellPadding: 1.4, halign: 'center', lineColor: [226,232,240], lineWidth: 0.1 },
+    headStyles: { fillColor: [248,250,252], textColor: [71,85,105], fontStyle: 'bold' },
+    columnStyles: { 0: { halign: 'left', fontStyle: 'bold' } },
+    margin: { left: 8, right: 8 }, tableWidth: 'wrap',
+  });
+
+  doc.setFontSize(7); doc.setTextColor(110);
+  doc.text('P=Présent   CP=Congé payé   RTT   AM=Arrêt maladie   ABI=Absence injustifiée   CS=Congé sans solde   +Xh=heures supp   gris=week-end/férié (F)', 8, doc.lastAutoTable.finalY + 5);
+
+  doc.save(`pointage-${currentYear}-${pad(currentMonth + 1)}.pdf`);
+}
+
 // ----- Navigation -----
 function prevMonth() { if (atMin()) return; if (--currentMonth < 0) { currentMonth = 11; currentYear--; } render(); }
 function nextMonth() { if (++currentMonth > 11) { currentMonth = 0; currentYear++; } render(); }
 document.getElementById('prev-btn').addEventListener('click', prevMonth);
 document.getElementById('next-btn').addEventListener('click', nextMonth);
-document.getElementById('pdf-btn').addEventListener('click', () => window.print());
+document.getElementById('pdf-btn').addEventListener('click', downloadPDF);
 document.addEventListener('keydown', (e) => {
   if (e.key === 'ArrowLeft') prevMonth();
   if (e.key === 'ArrowRight') nextMonth();
