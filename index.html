@@ -214,12 +214,9 @@
       </div>
     </div>
     <div class="flex items-center gap-2 flex-wrap">
-      <button id="today-btn" class="px-3 py-2 rounded-lg bg-white border border-slate-200 hover:bg-slate-50 text-sm font-semibold transition">Aujourd'hui</button>
-      <button id="leave-btn" class="px-3 py-2 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-sm font-bold flex items-center gap-2 shadow-sm transition">
+      <button id="leave-btn" class="px-4 py-2 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-sm font-bold flex items-center gap-2 shadow-sm transition">
         <span>🌴</span> Demande de congé
       </button>
-      <button id="export-btn" class="px-3 py-2 rounded-lg bg-white border border-slate-200 hover:bg-slate-50 text-sm font-semibold flex items-center gap-2 transition" title="Exporter en CSV"><span>📥</span> Export</button>
-      <button id="print-btn" class="px-3 py-2 rounded-lg bg-white border border-slate-200 hover:bg-slate-50 text-sm font-semibold transition" title="Imprimer">🖨️</button>
     </div>
   </header>
 
@@ -237,44 +234,7 @@
     <div class="flex items-center gap-2 text-xs text-slate-500"><span id="status-line"></span></div>
   </div>
 
-  <div class="grid grid-cols-1 lg:grid-cols-[1fr_290px] gap-5">
-    <main><div id="calendar"></div></main>
-
-    <aside class="sidebar space-y-4">
-      <div class="glass rounded-2xl p-5">
-        <h3 class="text-xs font-extrabold uppercase tracking-wider text-slate-500 mb-3">Équipe</h3>
-        <div id="collaborators-list" class="space-y-2"></div>
-      </div>
-
-      <div class="glass rounded-2xl p-5">
-        <h3 class="text-xs font-extrabold uppercase tracking-wider text-slate-500 mb-3">Légende</h3>
-        <div class="space-y-2 text-sm">
-          <div class="flex items-center gap-2"><span class="inline-block w-8 h-4 rounded" style="background:#475569"></span><span><strong>Matin</strong> · 8h–16h</span></div>
-          <div class="flex items-center gap-2"><span class="inline-block w-8 h-4 rounded" style="background:#1e293b"></span><span><strong>Soir</strong> · 11h–19h</span></div>
-          <div class="flex items-center gap-2 pt-2 border-t border-slate-200"><span>⚡</span><span>Remplacement (renfort)</span></div>
-          <div class="flex items-center gap-2"><span class="inline-block w-3 h-3 rounded-sm" style="background:linear-gradient(180deg,#fffbeb,#fef3c7);border:1px solid #fde68a"></span><span>Horaires réduits · 9h–18h (2 concierges)</span></div>
-          <div class="flex items-center gap-2"><span class="inline-block w-3 h-3 rounded-sm" style="background:linear-gradient(180deg,#fef2f2,#fee2e2);border:1px solid #fecaca"></span><span>Jour férié</span></div>
-        </div>
-      </div>
-
-      <div class="glass rounded-2xl p-5">
-        <h3 class="text-xs font-extrabold uppercase tracking-wider text-slate-500 mb-3">Récap du mois</h3>
-        <div id="stats" class="space-y-2"></div>
-      </div>
-
-      <div class="glass rounded-2xl p-5">
-        <h3 class="text-xs font-extrabold uppercase tracking-wider text-slate-500 mb-3">Fonctionnement</h3>
-        <ul class="text-xs text-slate-600 space-y-2 leading-relaxed">
-          <li>• TB3 : Émilie & Flora — un matin + un soir, jamais sur le même shift.</li>
-          <li>• TB4 : Chiara & Cédric — un matin + un soir, jamais sur le même shift.</li>
-          <li>• Absence d'un concierge → son binôme bascule, un renfort (Dynah, sinon Charles) prend la place restante.</li>
-          <li>• Horaires réduits (13/07 → 28/08 + jours de pont) : 9h–18h, les 2 concierges du bâtiment ensemble.</li>
-          <li>• En horaires réduits, si un concierge est absent, l'autre assure seul (pas de renfort).</li>
-          <li class="pt-2 border-t border-slate-200">📋 Planning en lecture seule. Pour poser des congés, utilisez le bouton <strong>Demande de congé</strong>.</li>
-        </ul>
-      </div>
-    </aside>
-  </div>
+  <main><div id="calendar"></div></main>
 
   <footer class="mt-8 text-center text-xs text-slate-400 no-print">
     Planning en lecture seule · Les demandes de congé sont envoyées à charles@thebureau.paris
@@ -526,7 +486,7 @@ function collectWarnings(sch) {
 }
 
 // ----- Rendering -----
-function render() { renderHeader(); renderCalendar(); renderStats(); renderStatusLine(); }
+function render() { renderHeader(); renderCalendar(); renderStatusLine(); }
 function renderHeader() { document.getElementById('period-label').textContent = `${MONTHS_FR[currentMonth]} ${currentYear}`; }
 function renderStatusLine() {
   const first = new Date(currentYear, currentMonth, 1), last = new Date(currentYear, currentMonth + 1, 0);
@@ -590,47 +550,6 @@ function renderShiftBar(shift, label) {
   const colorClass = meta ? `clr-${meta.color}` : 'clr-none';
   return `<div class="shift-bar ${colorClass} ${shift.substituteFor ? 'is-sub' : ''} ${!shift.person ? 'is-none' : ''}">
       <span class="when">${label}</span><span class="name">${meta ? meta.shortName : '⚠️ Aucun'}</span></div>`;
-}
-
-function renderStats() {
-  const stats = {};
-  for (const p of Object.keys(COLLABORATORS)) stats[p] = { shifts: 0, cp: 0 };
-  const first = new Date(currentYear, currentMonth, 1), last = new Date(currentYear, currentMonth + 1, 0);
-  for (let d = new Date(first); d <= last; d.setDate(d.getDate()+1)) {
-    const sch = genDay(d), dStr = fmt(d);
-    if (!sch.off) {
-      for (const b of ['TB3','TB4']) {
-        const blk = sch[b];
-        const shifts = blk.slots ? blk.slots : [blk.morning, blk.evening];
-        shifts.forEach(s => { if (s && s.person && stats[s.person]) stats[s.person].shifts++; });
-      }
-    }
-    for (const p of Object.keys(COLLABORATORS)) if (isAbsent(p, dStr)) stats[p].cp++;
-  }
-  let html = '';
-  for (const name of Object.keys(COLLABORATORS)) {
-    const s = stats[name], c = COLOR_HEX[COLLABORATORS[name].color];
-    html += `<div class="flex items-center justify-between text-sm py-1.5">
-        <div class="flex items-center gap-2 min-w-0"><span class="w-2.5 h-2.5 rounded-full flex-shrink-0" style="background:${c}"></span><span class="font-semibold truncate">${COLLABORATORS[name].shortName}</span></div>
-        <div class="flex gap-2 text-xs items-center flex-shrink-0">
-          ${s.shifts ? `<span class="px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 font-bold" title="Shifts travaillés">${s.shifts}</span>` : '<span class="text-slate-300">—</span>'}
-          ${s.cp ? `<span class="px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 font-bold" title="Jours de CP">🌴 ${s.cp}</span>` : ''}
-        </div></div>`;
-  }
-  document.getElementById('stats').innerHTML = html;
-}
-
-function renderCollaborators() {
-  let html = '';
-  for (const [name, info] of Object.entries(COLLABORATORS)) {
-    const c = COLOR_HEX[info.color];
-    const role = info.role === 'concierge' ? info.building : 'Renfort';
-    html += `<div class="collab-card" style="--c:${c}">
-        <div class="collab-avatar">${info.shortName[0]}</div>
-        <div class="flex-1 min-w-0"><div class="font-bold text-sm truncate">${info.shortName}</div><div class="text-[11px] text-slate-500 font-medium">${role}</div></div>
-      </div>`;
-  }
-  document.getElementById('collaborators-list').innerHTML = html;
 }
 
 // ============================================================
@@ -838,53 +757,9 @@ function prevMonth() { if (--currentMonth < 0) { currentMonth = 11; currentYear-
 function nextMonth() { if (++currentMonth > 11) { currentMonth = 0; currentYear++; } render(); }
 document.getElementById('prev-btn').addEventListener('click', prevMonth);
 document.getElementById('next-btn').addEventListener('click', nextMonth);
-document.getElementById('today-btn').addEventListener('click', () => {
-  if (today.getFullYear() === 2026) { currentMonth = today.getMonth(); currentYear = 2026; }
-  else { currentMonth = 5; currentYear = 2026; }
-  render();
-});
 document.getElementById('leave-btn').addEventListener('click', () => openLeaveModal());
-document.getElementById('print-btn').addEventListener('click', () => window.print());
-document.getElementById('export-btn').addEventListener('click', exportCSV);
-
-// ----- Export CSV -----
-function exportCSV() {
-  const lines = ['Date;Jour;TB3 Matin;TB3 Soir;TB4 Matin;TB4 Soir;Horaires;Notes'];
-  const first = new Date(currentYear, currentMonth, 1), last = new Date(currentYear, currentMonth + 1, 0);
-  for (let d = new Date(first); d <= last; d.setDate(d.getDate()+1)) {
-    const sch = genDay(d), dStr = fmt(d), dayLbl = DAYS_FR[d.getDay()];
-    if (sch.isWeekend) continue;
-    if (sch.holiday) { lines.push([dStr, dayLbl, '', '', '', '', 'Férié — ' + sch.holiday, ''].map(csvEsc).join(';')); continue; }
-    let tb3m, tb3s, tb4m, tb4s, notes = [];
-    const horaires = sch.reduced ? '9h-18h (réduit)' : '8h-16h / 11h-19h';
-    if (sch.reduced) {
-      const t3 = sch.TB3.slots.map(s => s.person ? SN(s.person) : 'AUCUN');
-      const t4 = sch.TB4.slots.map(s => s.person ? SN(s.person) : 'AUCUN');
-      tb3m = t3[0] || '—'; tb3s = t3[1] || '—';
-      tb4m = t4[0] || '—'; tb4s = t4[1] || '—';
-      sch.TB3.slots.forEach(s => { if (s.substituteFor) notes.push(`TB3 : ${SN(s.person)} remplace ${SN(s.substituteFor)}`); });
-      sch.TB4.slots.forEach(s => { if (s.substituteFor) notes.push(`TB4 : ${SN(s.person)} remplace ${SN(s.substituteFor)}`); });
-    } else {
-      tb3m = sch.TB3.morning.person ? SN(sch.TB3.morning.person) : 'AUCUN';
-      tb3s = sch.TB3.evening.person ? SN(sch.TB3.evening.person) : 'AUCUN';
-      tb4m = sch.TB4.morning.person ? SN(sch.TB4.morning.person) : 'AUCUN';
-      tb4s = sch.TB4.evening.person ? SN(sch.TB4.evening.person) : 'AUCUN';
-      ['morning','evening'].forEach(slot => ['TB3','TB4'].forEach(b => {
-        const s = sch[b][slot];
-        if (s.substituteFor) notes.push(`${b} ${slot === 'morning' ? 'matin' : 'soir'}: ${SN(s.person)} ${s.swapped ? 'bascule depuis' : 'remplace'} ${SN(s.substituteFor)}`);
-      }));
-    }
-    lines.push([dStr, dayLbl, tb3m, tb3s, tb4m, tb4s, horaires, notes.join(' | ')].map(csvEsc).join(';'));
-  }
-  const blob = new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8;' });
-  const url = URL.createObjectURL(blob), link = document.createElement('a');
-  link.href = url; link.download = `planning-conciergerie-${currentYear}-${pad(currentMonth+1)}.csv`;
-  document.body.appendChild(link); link.click(); document.body.removeChild(link); URL.revokeObjectURL(url);
-}
-function csvEsc(v) { v = String(v ?? ''); return /[;"\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; }
 
 // ----- Init -----
-renderCollaborators();
 render();
 </script>
 </body>
