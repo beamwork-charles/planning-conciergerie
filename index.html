@@ -737,7 +737,7 @@ function getLeaveEmail() {
     return p.start === end ? `- le ${fmtFR(p.start)}` : `- du ${fmtFR(p.start)} au ${fmtFR(end)}`;
   });
   const conf = leaveConflicts(requester, dates);
-  let body = `Bonjour Charles,\n\n${name} souhaite poser des congés :\n${periodLines.join('\n')}\n\nTotal : ${dates.length} jour(s), dont ${working} jour(s) ouvré(s).\n`;
+  let body = `Bonjour Charles,\n\nJe souhaite poser des congés :\n${periodLines.join('\n')}\n\nTotal : ${dates.length} jour(s), dont ${working} jour(s) ouvré(s).\n`;
   if (conf.length) {
     body += `\nPoints de vigilance (chevauchement avec des absences connues) :\n`;
     body += conf.map(c => `- ${fmtFR(c.date)} : ${c.notes.join(' ; ')}`).join('\n') + '\n';
