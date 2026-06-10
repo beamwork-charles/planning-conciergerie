@@ -27,14 +27,14 @@
     box-shadow: 0 1px 3px rgba(15,23,42,.04), 0 4px 20px rgba(15,23,42,.04);
   }
 
-  /* Person colors as CSS vars */
-  .clr-emilie  { --c:#ec4899; --cl:#fce7f3; --cd:#9d174d; }
-  .clr-flora   { --c:#a855f7; --cl:#f3e8ff; --cd:#6b21a8; }
-  .clr-chiara  { --c:#14b8a6; --cl:#ccfbf1; --cd:#115e59; }
-  .clr-cedric  { --c:#3b82f6; --cl:#dbeafe; --cd:#1e40af; }
-  .clr-dynah   { --c:#f59e0b; --cl:#fef3c7; --cd:#92400e; }
-  .clr-charles { --c:#10b981; --cl:#d1fae5; --cd:#065f46; }
-  .clr-none    { --c:#94a3b8; --cl:#f1f5f9; --cd:#334155; }
+  /* Person colors as CSS vars (--c: avatar, --cb: shift bar bg, --cl: light, --cd: dark) */
+  .clr-emilie  { --c:#ec4899; --cb:#be185d; --cl:#fce7f3; --cd:#9d174d; }
+  .clr-flora   { --c:#a855f7; --cb:#7e22ce; --cl:#f3e8ff; --cd:#6b21a8; }
+  .clr-chiara  { --c:#14b8a6; --cb:#0f766e; --cl:#ccfbf1; --cd:#115e59; }
+  .clr-cedric  { --c:#3b82f6; --cb:#1d4ed8; --cl:#dbeafe; --cd:#1e40af; }
+  .clr-dynah   { --c:#f59e0b; --cb:#b45309; --cl:#fef3c7; --cd:#92400e; }
+  .clr-charles { --c:#10b981; --cb:#047857; --cl:#d1fae5; --cd:#065f46; }
+  .clr-none    { --c:#94a3b8; --cb:#475569; --cl:#f1f5f9; --cd:#334155; }
 
   .calendar-grid {
     display: grid;
@@ -53,14 +53,14 @@
   .day-cell {
     background: rgba(255,255,255,0.85);
     border-radius: 16px;
-    padding: 12px;
+    padding: 10px;
     border: 1px solid #e2e8f0;
     transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
     cursor: pointer;
-    min-height: 168px;
+    min-height: 200px;
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 7px;
     position: relative;
     overflow: hidden;
   }
@@ -110,85 +110,52 @@
   .pill-reduced { background: #f59e0b; color: white; }
   .pill-holiday { background: #ef4444; color: white; }
 
-  .building-block {
-    border-radius: 10px;
-    padding: 6px 8px;
-    background: rgba(248,250,252,.6);
-    border: 1px solid #e2e8f0;
-  }
-  .building-label {
-    font-size: 9px;
+  .bld-section { display: flex; flex-direction: column; gap: 4px; }
+  .bld-label {
+    font-size: 10px;
     font-weight: 800;
-    color: #475569;
+    color: #64748b;
     text-transform: uppercase;
     letter-spacing: 0.8px;
-    margin-bottom: 3px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
+    padding-left: 2px;
+    margin-bottom: 1px;
   }
 
-  .shift-row {
+  .shift-bar {
     display: flex;
     align-items: center;
-    gap: 5px;
-    padding: 2px 0;
-    font-size: 11px;
-  }
-  .shift-icon {
-    flex-shrink: 0;
-    width: 14px;
-    text-align: center;
-  }
-  .person-chip {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    padding: 2px 7px;
-    border-radius: 6px;
-    font-size: 10.5px;
-    font-weight: 700;
-    color: var(--cd);
-    background: var(--cl);
-    border: 1px solid color-mix(in srgb, var(--c) 30%, transparent);
-    line-height: 1.2;
-  }
-  .person-chip-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--c); }
-  .person-chip.swap { box-shadow: 0 0 0 1px var(--c) inset; }
-  .sub-tag {
-    font-size: 9px;
-    color: #64748b;
-    font-style: italic;
-    font-weight: 500;
-  }
-
-  .renfort-strip {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    margin-top: auto;
-    padding-top: 6px;
-    border-top: 1px dashed #e2e8f0;
-    font-size: 9px;
-    color: #64748b;
+    gap: 8px;
+    padding: 6px 10px;
+    border-radius: 8px;
+    background: var(--cb, #475569);
+    color: white;
+    font-size: 12.5px;
     font-weight: 600;
+    min-height: 28px;
+    line-height: 1.1;
   }
-  .renfort-mini {
-    display: inline-flex;
-    align-items: center;
-    gap: 3px;
-    padding: 2px 5px;
-    border-radius: 5px;
-    background: var(--cl);
-    color: var(--cd);
-    border: 1px solid color-mix(in srgb, var(--c) 30%, transparent);
+  .shift-bar .when {
+    font-size: 10px;
     font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 0.3px;
+    letter-spacing: 0.6px;
+    opacity: 0.85;
+    flex-shrink: 0;
   }
-  .renfort-mini.cp { opacity: .55; }
-  .renfort-mini.shift::before { content: '⚡'; }
-  .renfort-mini.cp::before { content: '🌴'; }
+  .shift-bar .name {
+    font-weight: 700;
+    font-size: 13px;
+    margin-left: auto;
+  }
+  .shift-bar.is-sub .when::before {
+    content: '⚡';
+    margin-right: 3px;
+    opacity: 0.95;
+  }
+  .shift-bar.is-none {
+    background: repeating-linear-gradient(45deg, #fca5a5 0 8px, #ef4444 8px 16px);
+    color: white;
+  }
 
   .warning-flag {
     position: absolute;
@@ -284,10 +251,11 @@
     aside.sidebar { order: -1; }
   }
   @media (max-width: 700px) {
-    .day-cell { min-height: 130px; padding: 8px; }
+    .day-cell { min-height: 160px; padding: 8px; }
     .day-number { font-size: 14px; }
-    .person-chip { font-size: 9.5px; padding: 1px 5px; }
-    .building-label { font-size: 8px; }
+    .shift-bar { font-size: 11.5px; min-height: 24px; padding: 5px 8px; }
+    .shift-bar .name { font-size: 12px; }
+    .bld-label { font-size: 9px; }
   }
 
   .smooth-tab {
@@ -893,43 +861,34 @@ function renderDayCell(date, isCurrent, isToday) {
 }
 
 function renderBuildingMini(name, blk, reduced) {
-  let html = `<div class="building-block"><div class="building-label"><span>${name}</span></div>`;
+  let html = `<div class="bld-section"><div class="bld-label">${name}</div>`;
   if (reduced) {
-    html += renderShiftLine(blk.single, '🌤️');
+    html += renderShiftBar(blk.single, 'Été');
   } else {
-    html += renderShiftLine(blk.morning, '☀️');
-    html += renderShiftLine(blk.evening, '🌙');
+    html += renderShiftBar(blk.morning, 'Matin');
+    html += renderShiftBar(blk.evening, 'Soir');
   }
   html += `</div>`;
   return html;
 }
 
-function renderShiftLine(shift, icon) {
+function renderShiftBar(shift, label) {
   const person = shift.person;
   const meta = person ? COLLABORATORS[person] : null;
   const colorClass = meta ? `clr-${meta.color}` : 'clr-none';
-  const swapCls = shift.swapped ? 'swap' : '';
-  const subTag = shift.substituteFor
-    ? `<span class="sub-tag">↔ ${COLLABORATORS[shift.substituteFor]?.shortName || shift.substituteFor}</span>`
-    : '';
+  const isSub = !!shift.substituteFor;
+  const noneCls = !person ? 'is-none' : '';
   return `
-    <div class="shift-row ${colorClass}">
-      <span class="shift-icon">${icon}</span>
-      <span class="person-chip ${swapCls}"><span class="person-chip-dot"></span>${person ? (meta?.shortName || person) : '⚠️'}</span>
-      ${subTag}
+    <div class="shift-bar ${colorClass} ${isSub ? 'is-sub' : ''} ${noneCls}">
+      <span class="when">${label}</span>
+      <span class="name">${meta ? meta.shortName : '⚠️ Aucun'}</span>
     </div>
   `;
 }
 
 function renderRenfortStripMini(sch) {
-  const parts = [];
-  // Only show interesting states
-  if (sch.dynah === 'shift') parts.push(`<span class="renfort-mini shift clr-dynah">Dynah</span>`);
-  else if (sch.dynah === 'cp') parts.push(`<span class="renfort-mini cp clr-dynah">Dynah CP</span>`);
-  if (sch.charles === 'shift') parts.push(`<span class="renfort-mini shift clr-charles">Charles</span>`);
-  else if (sch.charles === 'cp') parts.push(`<span class="renfort-mini cp clr-charles">Charles CP</span>`);
-  if (parts.length === 0) return '';
-  return `<div class="renfort-strip">${parts.join(' ')}</div>`;
+  // Removed from cells for clarity — info available in day detail modal
+  return '';
 }
 
 function renderStats() {
