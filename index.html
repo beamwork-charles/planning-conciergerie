@@ -358,6 +358,10 @@ let currentMonth, currentYear;
 const today = new Date(); today.setHours(0,0,0,0);
 if (today.getFullYear() === 2026) { currentMonth = today.getMonth(); currentYear = 2026; }
 else { currentMonth = 5; currentYear = 2026; }
+// Juin 2026 = premier mois visible — rien avant n'est accessible
+const MIN_Y = 2026, MIN_M = 5;
+if (currentYear < MIN_Y || (currentYear === MIN_Y && currentMonth < MIN_M)) { currentYear = MIN_Y; currentMonth = MIN_M; }
+function atMin() { return currentYear === MIN_Y && currentMonth <= MIN_M; }
 
 // ----- Date helpers -----
 const pad = n => String(n).padStart(2, '0');
@@ -500,7 +504,10 @@ function collectWarnings(sch) {
 }
 
 // ----- Rendering -----
-function render() { renderHeader(); renderCalendar(); renderStatusLine(); }
+function render() {
+  renderHeader(); renderCalendar(); renderStatusLine();
+  document.getElementById('prev-btn').style.visibility = atMin() ? 'hidden' : 'visible';
+}
 function renderHeader() { document.getElementById('period-label').textContent = `${MONTHS_FR[currentMonth]} ${currentYear}`; }
 function renderStatusLine() {
   const first = new Date(currentYear, currentMonth, 1), last = new Date(currentYear, currentMonth + 1, 0);
@@ -780,7 +787,7 @@ document.addEventListener('keydown', (e) => {
 });
 
 // ----- Navigation -----
-function prevMonth() { if (--currentMonth < 0) { currentMonth = 11; currentYear--; } render(); }
+function prevMonth() { if (atMin()) return; if (--currentMonth < 0) { currentMonth = 11; currentYear--; } render(); }
 function nextMonth() { if (++currentMonth > 11) { currentMonth = 0; currentYear++; } render(); }
 document.getElementById('prev-btn').addEventListener('click', prevMonth);
 document.getElementById('next-btn').addEventListener('click', nextMonth);
