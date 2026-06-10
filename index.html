@@ -252,7 +252,7 @@
           <div class="flex items-center gap-2"><span class="inline-block w-8 h-4 rounded" style="background:#475569"></span><span><strong>Matin</strong> · 8h–16h</span></div>
           <div class="flex items-center gap-2"><span class="inline-block w-8 h-4 rounded" style="background:#1e293b"></span><span><strong>Soir</strong> · 11h–19h</span></div>
           <div class="flex items-center gap-2 pt-2 border-t border-slate-200"><span>⚡</span><span>Remplacement (renfort)</span></div>
-          <div class="flex items-center gap-2"><span class="inline-block w-3 h-3 rounded-sm" style="background:linear-gradient(180deg,#fffbeb,#fef3c7);border:1px solid #fde68a"></span><span>Horaires d'été · 9h–18h</span></div>
+          <div class="flex items-center gap-2"><span class="inline-block w-3 h-3 rounded-sm" style="background:linear-gradient(180deg,#fffbeb,#fef3c7);border:1px solid #fde68a"></span><span>Horaires réduits · 9h–18h (2 concierges)</span></div>
           <div class="flex items-center gap-2"><span class="inline-block w-3 h-3 rounded-sm" style="background:linear-gradient(180deg,#fef2f2,#fee2e2);border:1px solid #fecaca"></span><span>Jour férié</span></div>
         </div>
       </div>
@@ -268,7 +268,8 @@
           <li>• TB3 : Émilie & Flora — un matin + un soir, jamais sur le même shift.</li>
           <li>• TB4 : Chiara & Cédric — un matin + un soir, jamais sur le même shift.</li>
           <li>• Absence d'un concierge → son binôme bascule, un renfort (Dynah, sinon Charles) prend la place restante.</li>
-          <li>• Été (13/07 → 28/08) : horaires réduits 9h–18h.</li>
+          <li>• Horaires réduits (13/07 → 28/08 + jours de pont) : 9h–18h, les 2 concierges du bâtiment ensemble.</li>
+          <li>• En horaires réduits, si un concierge est absent, l'autre assure seul (pas de renfort).</li>
           <li class="pt-2 border-t border-slate-200">📋 Planning en lecture seule. Pour poser des congés, utilisez le bouton <strong>Demande de congé</strong>.</li>
         </ul>
       </div>
@@ -340,6 +341,7 @@ const COLLABORATORS = {
   Charles: { building: null,  color: 'charles', role: 'renfort',   shortName: 'Charles' },
 };
 const PARTNER = { Emilie: 'Flora', Flora: 'Emilie', Cédric: 'Chiara', Chiara: 'Cédric' };
+const BUILDING_CONCIERGES = { TB3: ['Emilie', 'Flora'], TB4: ['Cédric', 'Chiara'] };
 
 const COLOR_HEX = {
   emilie: '#ec4899', flora: '#a855f7', chiara: '#14b8a6',
@@ -358,6 +360,7 @@ const ABSENCES = {
   Chiara:  ['2026-09-07','2026-09-08','2026-09-09','2026-09-10'],
   Cédric:  [],
   Dynah:   [
+    '2026-07-13',
     '2026-07-27','2026-07-28','2026-07-29','2026-07-30','2026-07-31',
     '2026-08-01','2026-08-02','2026-08-03','2026-08-04','2026-08-05','2026-08-06','2026-08-07',
     '2026-09-09','2026-09-10','2026-09-11',
@@ -393,9 +396,18 @@ function range(startStr, endStr) {
   for (let d = new Date(a); d <= b; d.setDate(d.getDate()+1)) out.push(fmt(d));
   return out;
 }
-function isReducedDay(d) { return d >= REDUCED_START && d <= REDUCED_END; }
 function isHoliday(d) { return HOLIDAYS_2026[fmt(d)]; }
 function isWorkday(d) { const w = d.getDay(); return w !== 0 && w !== 6 && !isHoliday(d); }
+// Jour de pont : vendredi après un jeudi férié, ou lundi avant un mardi férié
+function isBridgeDay(d) {
+  if (!isWorkday(d)) return false;
+  const dow = d.getDay();
+  if (dow === 5) { const p = new Date(d); p.setDate(p.getDate()-1); if (isHoliday(p)) return true; }
+  if (dow === 1) { const n = new Date(d); n.setDate(n.getDate()+1); if (isHoliday(n)) return true; }
+  return false;
+}
+// Horaires réduits : période 13/07–28/08 OU jour de pont
+function isReducedDay(d) { return (d >= REDUCED_START && d <= REDUCED_END) || isBridgeDay(d); }
 function getWeekParity(d) {
   const monday = new Date(d);
   monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7));
@@ -424,8 +436,8 @@ function genDay(date) {
   if (reduced) {
     schedule = {
       date: dateStr, reduced: true, holiday: null, isWeekend: false,
-      TB3: { single: mkShift('9h-18h', morningTB3) },
-      TB4: { single: mkShift('9h-18h', morningTB4) }
+      TB3: { slots: BUILDING_CONCIERGES.TB3.map(p => mkShift('9h-18h', p)) },
+      TB4: { slots: BUILDING_CONCIERGES.TB4.map(p => mkShift('9h-18h', p)) }
     };
   } else {
     schedule = {
@@ -448,8 +460,18 @@ function mkShift(time, person) { return { time, person, defaultPerson: person, s
 function applySubs(schedule, absentToday) {
   if (schedule.reduced) {
     for (const b of ['TB3','TB4']) {
-      const s = schedule[b].single;
-      if (absentToday.has(s.person)) { s.substituteFor = s.person; s.person = findSub(absentToday); }
+      const blk = schedule[b];
+      const present = blk.slots.filter(s => !absentToday.has(s.person));
+      if (present.length === 0) {
+        // Les 2 concierges absents → un renfort assure le 9h-18h
+        const sub = findSub(absentToday);
+        const slot = mkShift('9h-18h', sub);
+        slot.substituteFor = blk.slots[0].person;
+        blk.slots = [slot];
+      } else {
+        // Un (ou deux) concierge(s) présent(s) assurent — pas de renfort
+        blk.slots = present;
+      }
     }
   } else {
     for (const b of ['TB3','TB4']) {
@@ -483,7 +505,7 @@ function computeStatus(person, schedule, absentToday) {
   if (absentToday.has(person)) return 'cp';
   for (const b of ['TB3','TB4']) {
     const blk = schedule[b];
-    if (blk.single && blk.single.person === person) return 'shift';
+    if (blk.slots) { if (blk.slots.some(s => s.person === person)) return 'shift'; }
     if (blk.morning && blk.morning.person === person) return 'shift';
     if (blk.evening && blk.evening.person === person) return 'shift';
   }
@@ -493,7 +515,7 @@ function collectWarnings(sch) {
   const warns = [];
   for (const b of ['TB3','TB4']) {
     const blk = sch[b];
-    if (blk.single) { if (!blk.single.person) warns.push(`${b} : aucun remplaçant disponible (9h-18h)`); }
+    if (blk.slots) { if (blk.slots.some(s => !s.person)) warns.push(`${b} : aucun concierge ni remplaçant (9h-18h)`); }
     else {
       if (!blk.morning.person) warns.push(`${b} matin : aucun remplaçant`);
       if (!blk.evening.person) warns.push(`${b} soir : aucun remplaçant`);
@@ -511,7 +533,7 @@ function renderStatusLine() {
   let reducedInMonth = false;
   for (let d = new Date(first); d <= last; d.setDate(d.getDate()+1)) if (isReducedDay(d)) { reducedInMonth = true; break; }
   document.getElementById('status-line').innerHTML = reducedInMonth
-    ? `<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-amber-50 text-amber-800 border border-amber-200 font-semibold">🌤️ Horaires d'été actifs ce mois</span>` : '';
+    ? `<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-amber-50 text-amber-800 border border-amber-200 font-semibold">🕘 Horaires réduits ce mois</span>` : '';
 }
 
 function renderCalendar() {
@@ -551,15 +573,15 @@ function renderDayCell(date, isCurrent, isToday) {
   if (sch.isWeekend) return html + `<div class="text-[11px] text-slate-400 italic mt-2">Weekend</div></div>`;
   if (sch.holiday)   return html + `<div class="text-[11px] text-red-600 font-semibold mt-1">${sch.holiday}</div></div>`;
 
-  html += renderBuildingMini('TB3', sch.TB3, sch.reduced);
-  html += renderBuildingMini('TB4', sch.TB4, sch.reduced);
+  html += renderBuildingMini('TB3', sch.TB3);
+  html += renderBuildingMini('TB4', sch.TB4);
   html += `</div>`;
   return html;
 }
 
-function renderBuildingMini(name, blk, reduced) {
+function renderBuildingMini(name, blk) {
   let html = `<div class="bld-section"><div class="bld-label">${name}</div>`;
-  if (reduced) html += renderShiftBar(blk.single, 'Été');
+  if (blk.slots) html += blk.slots.map(s => renderShiftBar(s, '9h-18h')).join('');
   else { html += renderShiftBar(blk.morning, 'Matin'); html += renderShiftBar(blk.evening, 'Soir'); }
   return html + `</div>`;
 }
@@ -577,9 +599,11 @@ function renderStats() {
   for (let d = new Date(first); d <= last; d.setDate(d.getDate()+1)) {
     const sch = genDay(d), dStr = fmt(d);
     if (!sch.off) {
-      for (const b of ['TB3','TB4']) ['single','morning','evening'].forEach(k => {
-        const s = sch[b][k]; if (s && s.person && stats[s.person]) stats[s.person].shifts++;
-      });
+      for (const b of ['TB3','TB4']) {
+        const blk = sch[b];
+        const shifts = blk.slots ? blk.slots : [blk.morning, blk.evening];
+        shifts.forEach(s => { if (s && s.person && stats[s.person]) stats[s.person].shifts++; });
+      }
     }
     for (const p of Object.keys(COLLABORATORS)) if (isAbsent(p, dStr)) stats[p].cp++;
   }
@@ -799,12 +823,14 @@ function exportCSV() {
     if (sch.isWeekend) continue;
     if (sch.holiday) { lines.push([dStr, dayLbl, '', '', '', '', 'Férié — ' + sch.holiday, ''].map(csvEsc).join(';')); continue; }
     let tb3m, tb3s, tb4m, tb4s, notes = [];
-    const horaires = sch.reduced ? '9h-18h (été)' : '8h-16h / 11h-19h';
+    const horaires = sch.reduced ? '9h-18h (réduit)' : '8h-16h / 11h-19h';
     if (sch.reduced) {
-      tb3m = sch.TB3.single.person ? SN(sch.TB3.single.person) : 'AUCUN'; tb3s = '—';
-      tb4m = sch.TB4.single.person ? SN(sch.TB4.single.person) : 'AUCUN'; tb4s = '—';
-      if (sch.TB3.single.substituteFor) notes.push(`${tb3m} remplace ${SN(sch.TB3.single.substituteFor)} (TB3)`);
-      if (sch.TB4.single.substituteFor) notes.push(`${tb4m} remplace ${SN(sch.TB4.single.substituteFor)} (TB4)`);
+      const t3 = sch.TB3.slots.map(s => s.person ? SN(s.person) : 'AUCUN');
+      const t4 = sch.TB4.slots.map(s => s.person ? SN(s.person) : 'AUCUN');
+      tb3m = t3[0] || '—'; tb3s = t3[1] || '—';
+      tb4m = t4[0] || '—'; tb4s = t4[1] || '—';
+      sch.TB3.slots.forEach(s => { if (s.substituteFor) notes.push(`TB3 : ${SN(s.person)} remplace ${SN(s.substituteFor)}`); });
+      sch.TB4.slots.forEach(s => { if (s.substituteFor) notes.push(`TB4 : ${SN(s.person)} remplace ${SN(s.substituteFor)}`); });
     } else {
       tb3m = sch.TB3.morning.person ? SN(sch.TB3.morning.person) : 'AUCUN';
       tb3s = sch.TB3.evening.person ? SN(sch.TB3.evening.person) : 'AUCUN';
