@@ -163,11 +163,9 @@ const CODE_STYLE = {
 const CODE_ORDER = ['P','CP','RTT','AM','ABI','CS'];
 
 // ----- State -----
-let currentMonth, currentYear;
-if (today.getFullYear() === 2026) { currentMonth = today.getMonth(); currentYear = 2026; }
-else { currentMonth = 5; currentYear = 2026; }
-if (currentYear < MIN_Y || (currentYear === MIN_Y && currentMonth < MIN_M)) { currentYear = MIN_Y; currentMonth = MIN_M; }
-function atMin() { return currentYear === MIN_Y && currentMonth <= MIN_M; }
+let currentMonth = today.getMonth(), currentYear = today.getFullYear();
+// Pointage RH : aucune limite d'historique
+function atMin() { return false; }
 
 const PEOPLE = Object.keys(COLLABORATORS);
 const WD_INITIAL = ['D','L','M','M','J','V','S'];
