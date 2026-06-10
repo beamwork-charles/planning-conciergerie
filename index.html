@@ -91,6 +91,15 @@
   .shift-bar.is-sub .when::before { content: '⚡'; margin-right: 3px; opacity: 0.95; }
   .shift-bar.is-none { background: repeating-linear-gradient(45deg, #fca5a5 0 8px, #ef4444 8px 16px); }
 
+  .extra-row { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 2px; }
+  .extra-chip {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 3px 8px; border-radius: 7px;
+    font-size: 10.5px; font-weight: 700; line-height: 1.2;
+    color: var(--cd); background: var(--cl);
+    border: 1px dashed color-mix(in srgb, var(--c) 50%, transparent);
+  }
+
   .warning-flag {
     position: absolute; top: 8px; right: 8px; width: 18px; height: 18px;
     background: #ef4444; color: white; border-radius: 50%;
@@ -329,6 +338,11 @@ const ABSENCES = {
   Charles: ['2026-06-15','2026-06-16','2026-06-17','2026-06-18','2026-06-19']
 };
 
+// Heures supplémentaires — { 'AAAA-MM-JJ': [ { person, label, hours } ] }
+const EXTRA_HOURS = {
+  '2026-06-24': [ { person: 'Emilie', label: '19h–22h', hours: 3 } ]
+};
+
 const HOLIDAYS_2026 = {
   '2026-01-01': "Jour de l'An", '2026-04-06': 'Lundi de Pâques', '2026-05-01': 'Fête du Travail',
   '2026-05-08': 'Victoire 1945', '2026-05-14': 'Ascension', '2026-05-25': 'Lundi de Pentecôte',
@@ -535,6 +549,7 @@ function renderDayCell(date, isCurrent, isToday) {
 
   html += renderBuildingMini('TB3', sch.TB3);
   html += renderBuildingMini('TB4', sch.TB4);
+  html += renderExtraHours(sch.date);
   html += `</div>`;
   return html;
 }
@@ -550,6 +565,18 @@ function renderShiftBar(shift, label) {
   const colorClass = meta ? `clr-${meta.color}` : 'clr-none';
   return `<div class="shift-bar ${colorClass} ${shift.substituteFor ? 'is-sub' : ''} ${!shift.person ? 'is-none' : ''}">
       <span class="when">${label}</span><span class="name">${meta ? meta.shortName : '⚠️ Aucun'}</span></div>`;
+}
+function renderExtraHours(dateStr) {
+  const list = EXTRA_HOURS[dateStr];
+  if (!list || !list.length) return '';
+  const chips = list.map(e => {
+    const meta = COLLABORATORS[e.person];
+    const cls = meta ? `clr-${meta.color}` : 'clr-none';
+    const name = meta ? meta.shortName : e.person;
+    const hrs = e.hours ? ` (+${e.hours}h)` : '';
+    return `<span class="extra-chip ${cls}">⏱ ${name} · ${e.label}${hrs}</span>`;
+  }).join('');
+  return `<div class="extra-row">${chips}</div>`;
 }
 
 // ============================================================
