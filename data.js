@@ -97,18 +97,20 @@ const POINTAGE_LABELS = {
 };
 
 // ===== Cumuls CP / RTT =====
-const CP_PER_MONTH  = 2.5;                 // jours de CP acquis à la fin de chaque mois (tous)
-const RTT_ANNUAL    = { Charles: 13 };     // dotation RTT annuelle (Charles uniquement)
-const ACCRUAL_START = { y: 2026, m: 5 };   // début d'acquisition des CP : juin 2026 (m: 0=janv)
-// Report / solde initial AU 31/05/2026 (soldes à fin mai, hors jours posés après cette date).
-// L'acquisition (CP 2,5/mois, RTT au prorata) démarre ensuite en juin via ACCRUAL_START.
+const CP_PER_MONTH  = 2.5;                 // jours de CP acquis à la fin de chaque mois (tous, Code du travail)
+const ACCRUAL_START = { y: 2026, m: 5 };   // début du suivi des CP : juin 2026 (m: 0=janv)
+// RTT : pas de dotation fixe. Charles est cadre au forfait jours → les jours de repos sont
+// recalculés chaque année civile par la formule forfait (voir FORFAIT_DAYS + rttAnnualForYear plus bas).
+// Report / solde initial DES CP au 31/05/2026 (soldes à fin mai, hors jours posés après cette date).
+// L'acquisition CP (2,5/mois) démarre ensuite en juin via ACCRUAL_START. Les RTT étant recalculés
+// chaque année par la formule, il n'y a pas de report manuel à saisir pour eux.
 const OPENING_BALANCE = {
   Emilie:  { cp: 20.5 },
   Flora:   { cp: 14 },
   Chiara:  { cp: 5 },
   Cédric:  { cp: 17.5 },
   Dynah:   { cp: 14 },
-  Charles: { cp: 6, rtt: 5.4 }
+  Charles: { cp: 6 }
 };
 // Règles métier : poser des CP/RTT ne réduit PAS l'acquisition. En toute rigueur, le congé sans
 // solde (CS) ne génère pas de CP, et l'arrêt maladie non pro génère 2 j/mois (loi 2024) — ces
@@ -132,14 +134,6 @@ const OVERRIDES = {
   }
 };
 
-const HOLIDAYS_2026 = {
-  '2026-01-01': "Jour de l'An", '2026-04-06': 'Lundi de Pâques', '2026-05-01': 'Fête du Travail',
-  '2026-05-08': 'Victoire 1945', '2026-05-14': 'Ascension', '2026-05-25': 'Lundi de Pentecôte',
-  '2026-07-14': 'Fête nationale', '2026-08-15': 'Assomption', '2026-11-01': 'Toussaint',
-  '2026-11-11': 'Armistice', '2026-12-25': 'Noël',
-  '2027-01-01': "Jour de l'An"
-};
-
 const MONTHS_FR = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
 const DAYS_FR   = ['Dimanche','Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi'];
 
@@ -158,8 +152,68 @@ function range(startStr, endStr) {
   for (let d = new Date(a); d <= b; d.setDate(d.getDate()+1)) out.push(fmt(d));
   return out;
 }
-function isHoliday(d) { return HOLIDAYS_2026[fmt(d)]; }
+// ===== Jours fériés français — calculés pour toute année (Pâques : Meeus/Jones/Butcher) =====
+function easterSunday(year) {
+  const a = year % 19, b = Math.floor(year / 100), c = year % 100;
+  const d = Math.floor(b / 4), e = b % 4, f = Math.floor((b + 8) / 25);
+  const g = Math.floor((b - f + 1) / 3);
+  const h = (19 * a + b - d - g + 15) % 30;
+  const i = Math.floor(c / 4), k = c % 4;
+  const l = (32 + 2 * e + 2 * i - h - k) % 7;
+  const m = Math.floor((a + 11 * h + 22 * l) / 451);
+  const month = Math.floor((h + l - 7 * m + 114) / 31);
+  const day = ((h + l - 7 * m + 114) % 31) + 1;
+  return new Date(year, month - 1, day);
+}
+const _holidayCache = {};
+function frenchHolidays(year) {
+  if (_holidayCache[year]) return _holidayCache[year];
+  const E = easterSunday(year);
+  const plus = n => { const dd = new Date(E); dd.setDate(dd.getDate() + n); return fmt(dd); };
+  const h = {
+    [`${year}-01-01`]: "Jour de l'An",
+    [plus(1)]:  'Lundi de Pâques',
+    [`${year}-05-01`]: 'Fête du Travail',
+    [`${year}-05-08`]: 'Victoire 1945',
+    [plus(39)]: 'Ascension',
+    [plus(50)]: 'Lundi de Pentecôte',
+    [`${year}-07-14`]: 'Fête nationale',
+    [`${year}-08-15`]: 'Assomption',
+    [`${year}-11-01`]: 'Toussaint',
+    [`${year}-11-11`]: 'Armistice',
+    [`${year}-12-25`]: 'Noël',
+  };
+  _holidayCache[year] = h;
+  return h;
+}
+function isHoliday(d) { return frenchHolidays(d.getFullYear())[fmt(d)]; }
 function isWorkday(d) { const w = d.getDay(); return w !== 0 && w !== 6 && !isHoliday(d); }
+
+// ===== RTT — forfait jours (cadres) =====
+// Jours de repos d'un cadre au forfait, pour une année civile =
+//   jours calendaires − samedis/dimanches − 25 CP légaux − fériés tombant un jour ouvré − forfait annuel.
+// Ex. Charles 2026 (forfait 214 j) : 365 − 104 − 25 − 9 − 214 = 13.
+const FORFAIT_DAYS  = { Charles: 214 };
+const CP_LEGAL_DAYS = 25;
+function daysInYear(year) { return ((year % 4 === 0 && year % 100 !== 0) || year % 400 === 0) ? 366 : 365; }
+function weekendDaysInYear(year) {
+  let n = 0;
+  for (let d = new Date(year, 0, 1); d.getFullYear() === year; d.setDate(d.getDate() + 1)) {
+    const w = d.getDay(); if (w === 0 || w === 6) n++;
+  }
+  return n;
+}
+function feriesOnWeekdays(year) {
+  let n = 0;
+  for (const ds in frenchHolidays(year)) { const w = parseD(ds).getDay(); if (w !== 0 && w !== 6) n++; }
+  return n;
+}
+// RTT théoriques de l'année (0 si la personne n'est pas au forfait jours)
+function rttAnnualForYear(person, year) {
+  const forfait = FORFAIT_DAYS[person];
+  if (!forfait) return 0;
+  return daysInYear(year) - weekendDaysInYear(year) - CP_LEGAL_DAYS - feriesOnWeekdays(year) - forfait;
+}
 // Jour de pont : vendredi après un jeudi férié, ou lundi avant un mardi férié
 function isBridgeDay(d) {
   if (!isWorkday(d)) return false;

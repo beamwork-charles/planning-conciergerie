@@ -141,7 +141,7 @@
       <div>
         <div class="text-xs font-extrabold uppercase tracking-wider text-slate-500 mb-2">Compteurs</div>
         <table class="counters" id="counters-table"></table>
-        <div class="text-[10px] text-slate-400 mt-1">Soldes au 31/05/2026 en report. CP acquis : 2,5 j/mois dès juin 2026. RTT (Charles) : 13 j/an au prorata mensuel. Solde = acquis − pris, à fin du mois affiché. H. supp = total du mois.</div>
+        <div class="text-[10px] text-slate-400 mt-1">Soldes CP au 31/05/2026 en report ; CP acquis 2,5 j/mois dès juin 2026. RTT (Charles, forfait 214 j) : jours de repos calculés par année civile, acquis au prorata mensuel (13 j en 2026). Solde = acquis − pris à fin du mois affiché. H. supp = total du mois.</div>
       </div>
     </div>
   </div>
@@ -270,10 +270,10 @@ function cpAcquired(person, y, m) {
   const op = (OPENING_BALANCE[person] && OPENING_BALANCE[person].cp) || 0;
   return op + CP_PER_MONTH * monthsAccrued(y, m);
 }
-// RTT acquis à fin du mois affiché = report initial + (dotation annuelle / 12) × mois écoulés
+// RTT acquis à fin du mois affiché = (RTT de l'année civile / 12) × mois écoulés dans l'année.
+// Forfait jours : dotation recalculée chaque année et remise à zéro au 1er janvier (pas de report).
 function rttAcquired(person, y, m) {
-  const op = (OPENING_BALANCE[person] && OPENING_BALANCE[person].rtt) || 0;
-  return op + ((RTT_ANNUAL[person] || 0) / 12) * monthsAccrued(y, m);
+  return rttAnnualForYear(person, y) * (m + 1) / 12;
 }
 // Jours d'un type posés entre le début d'acquisition et la fin du mois affiché (cumul à date)
 function countTypeUpTo(person, type, y, m) {
@@ -285,6 +285,17 @@ function countTypeUpTo(person, type, y, m) {
     if (a[ds] !== type) continue;
     const d = parseD(ds), idx = d.getFullYear() * 12 + d.getMonth();
     if (idx >= startIdx && idx <= viewIdx) n++;
+  }
+  return n;
+}
+// Jours d'un type posés dans l'année civile affichée jusqu'au mois inclus (pour les RTT, remis à zéro chaque an)
+function countTypeInYear(person, type, y, m) {
+  const a = ABSENCES[person] || {};
+  let n = 0;
+  for (const ds in a) {
+    if (a[ds] !== type) continue;
+    const d = parseD(ds);
+    if (d.getFullYear() === y && d.getMonth() <= m) n++;
   }
   return n;
 }
@@ -306,7 +317,7 @@ function renderCounters() {
     html += `<td class="num" style="color:${cpSolde < 0 ? '#dc2626' : '#166534'}">${fmtNum(cpSolde)}</td>`;
     if (canRtt) {
       const rttAcq = rttAcquired(p, currentYear, currentMonth);
-      const rttTaken = countTypeUpTo(p, 'RTT', currentYear, currentMonth);
+      const rttTaken = countTypeInYear(p, 'RTT', currentYear, currentMonth);
       const rttSolde = rttAcq - rttTaken;
       html += `<td class="num">${fmtNum(rttAcq)}</td><td class="num">${fmtNum(rttTaken)}</td>`;
       html += `<td class="num" style="color:${rttSolde < 0 ? '#dc2626' : '#6d28d9'}">${fmtNum(rttSolde)}</td>`;
@@ -385,7 +396,7 @@ function downloadPDF() {
       { content: fmtNum(cpSolde), styles: { fontStyle: 'bold', textColor: cpSolde < 0 ? [220,38,38] : [22,101,52] } },
     ];
     if (canRtt) {
-      const ra = rttAcquired(p, currentYear, currentMonth), rt = countTypeUpTo(p, 'RTT', currentYear, currentMonth), rs = ra - rt;
+      const ra = rttAcquired(p, currentYear, currentMonth), rt = countTypeInYear(p, 'RTT', currentYear, currentMonth), rs = ra - rt;
       row.push(fmtNum(ra), fmtNum(rt), { content: fmtNum(rs), styles: { fontStyle: 'bold', textColor: rs < 0 ? [220,38,38] : [109,40,217] } });
     } else {
       row.push({ content: '-', styles: grey }, { content: '-', styles: grey }, { content: '-', styles: grey });
