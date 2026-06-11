@@ -102,6 +102,26 @@
   .shift-bar.is-sub .when::before { content: '⚡'; margin-right: 3px; opacity: 0.95; }
   .shift-bar.is-none { background: repeating-linear-gradient(45deg, #fca5a5 0 8px, #ef4444 8px 16px); }
 
+  /* OFF row : concierge absent affiché grisé barré sous les shifts */
+  .off-row {
+    display: flex; align-items: center; gap: 6px;
+    padding: 3px 9px; border-radius: 7px;
+    background: #f1f5f9; border: 1px dashed #cbd5e1;
+    font-size: 11px; min-height: 22px; margin-top: 1px;
+  }
+  .off-row .off-dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--c, #94a3b8); opacity: .5; flex-shrink: 0;
+  }
+  .off-row .off-name {
+    font-weight: 700; color: #64748b;
+    text-decoration: line-through; text-decoration-color: #94a3b8;
+  }
+  .off-row .off-tag {
+    margin-left: auto; font-size: 9px; font-weight: 800; letter-spacing: .5px;
+    color: #475569; background: #e2e8f0; padding: 1px 6px; border-radius: 4px;
+  }
+
   .extra-row { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 2px; }
   .extra-chip {
     display: inline-flex; align-items: center; gap: 4px;
@@ -508,8 +528,18 @@ function renderBuildingMini(name, blk, dateStr) {
   let html = `<div class="bld-card ${name.toLowerCase()}"><div class="bld-label">${name}</div>`;
   if (blk.slots) html += blk.slots.map(s => renderShiftBar(s, '9h-18h')).join('');
   else { html += renderShiftBar(blk.morning, blk.morning.time); html += renderShiftBar(blk.evening, blk.evening.time); }
+  html += renderOffRows(name, dateStr);
   html += renderExtraHours(dateStr, name);
   return html + `</div>`;
+}
+function renderOffRows(building, dateStr) {
+  const absent = BUILDING_CONCIERGES[building].filter(p => isAbsent(p, dateStr));
+  if (!absent.length) return '';
+  return absent.map(p => {
+    const meta = COLLABORATORS[p];
+    return `<div class="off-row clr-${meta.color}" title="${meta.shortName} — absent ce jour">
+      <span class="off-dot"></span><span class="off-name">${meta.shortName}</span><span class="off-tag">OFF</span></div>`;
+  }).join('');
 }
 function renderShiftBar(shift, label) {
   const meta = shift.person ? COLLABORATORS[shift.person] : null;
