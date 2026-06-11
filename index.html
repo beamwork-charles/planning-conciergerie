@@ -346,8 +346,8 @@ function genDay(date) {
   if (reduced) {
     schedule = {
       date: dateStr, reduced: true, holiday: null, isWeekend: false,
-      TB3: { slots: BUILDING_CONCIERGES.TB3.map(p => mkShift('9h-18h', p)) },
-      TB4: { slots: BUILDING_CONCIERGES.TB4.map(p => mkShift('9h-18h', p)) }
+      TB3: { slots: BUILDING_CONCIERGES.TB3.map(p => mkShift('9h-17h', p)) },
+      TB4: { slots: BUILDING_CONCIERGES.TB4.map(p => mkShift('9h-17h', p)) }
     };
   } else {
     schedule = {
@@ -381,7 +381,7 @@ function applyOverrides(schedule, dateStr) {
     }
     if (ov[b].slots && schedule[b].slots) {
       schedule[b].slots = ov[b].slots.map(o => {
-        const sh = mkShift('9h-18h', o.person ?? null);
+        const sh = mkShift('9h-17h', o.person ?? null);
         sh.substituteFor = o.substituteFor ?? null;
         return sh;
       });
@@ -403,8 +403,8 @@ function applySubs(schedule, absentToday) {
       const blk = schedule[b];
       const present = blk.slots.filter(s => !absentToday.has(s.person));
       if (present.length === 0) {
-        // Les 2 concierges absents → un renfort assure le 9h-18h
-        const slot = mkShift('9h-18h', pickRenfort());
+        // Les 2 concierges absents → un renfort assure le 9h-17h
+        const slot = mkShift('9h-17h', pickRenfort());
         slot.substituteFor = blk.slots[0].person;
         blk.slots = [slot];
       } else {
@@ -440,7 +440,7 @@ function collectWarnings(sch) {
   const warns = [];
   for (const b of ['TB3','TB4']) {
     const blk = sch[b];
-    if (blk.slots) { if (blk.slots.some(s => !s.person)) warns.push(`${b} : aucun concierge ni remplaçant (9h-18h)`); }
+    if (blk.slots) { if (blk.slots.some(s => !s.person)) warns.push(`${b} : aucun concierge ni remplaçant (9h-17h)`); }
     else {
       if (!blk.morning.person) warns.push(`${b} matin : aucun remplaçant`);
       if (!blk.evening.person) warns.push(`${b} soir : aucun remplaçant`);
@@ -495,7 +495,7 @@ function renderDayCell(date, isCurrent, isToday) {
   if (sch.warnings && sch.warnings.length) html += `<div class="warning-flag" title="${sch.warnings.join(' · ')}">!</div>`;
 
   html += `<div class="flex items-center justify-between gap-1"><span class="day-number">${dayNum}</span><div class="flex items-center gap-1 flex-wrap justify-end">`;
-  if (sch.reduced && !sch.isWeekend && !sch.holiday) html += `<span class="pill pill-reduced">9h–18h</span>`;
+  if (sch.reduced && !sch.isWeekend && !sch.holiday) html += `<span class="pill pill-reduced">9h–17h</span>`;
   if (sch.holiday) html += `<span class="pill pill-holiday">Férié</span>`;
   html += `</div></div>`;
 
@@ -521,7 +521,7 @@ function renderManagers(dateStr) {
 
 function renderBuildingMini(name, blk, dateStr) {
   let html = `<div class="bld-card ${name.toLowerCase()}"><div class="bld-label">${name}</div>`;
-  if (blk.slots) html += blk.slots.map(s => renderShiftBar(s, '9h-18h')).join('');
+  if (blk.slots) html += blk.slots.map(s => renderShiftBar(s, '9h-17h')).join('');
   else { html += renderShiftBar(blk.morning, blk.morning.time); html += renderShiftBar(blk.evening, blk.evening.time); }
   html += renderOffRows(name, dateStr);
   html += renderExtraHours(dateStr, name);
