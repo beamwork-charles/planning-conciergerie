@@ -141,7 +141,7 @@
       <div>
         <div class="text-xs font-extrabold uppercase tracking-wider text-slate-500 mb-2">Compteurs</div>
         <table class="counters" id="counters-table"></table>
-        <div class="text-[10px] text-slate-400 mt-1">Soldes CP au 31/05/2026 en report ; CP acquis 2,5 j/mois dès juin 2026. RTT (Charles, forfait 214 j) : jours de repos calculés par année civile, acquis au prorata mensuel (13 j en 2026). Solde = acquis − pris à fin du mois affiché. H. supp = total du mois.</div>
+        <div class="text-[10px] text-slate-400 mt-1">CP : 2,5 j/mois, période 1er juin → 31 mai, remis à zéro au 31 mai (non pris = perdus) ; report au 31/05/2026 intégré. RTT (Charles, forfait 214 j) : jours de repos calculés par année civile, prorata mensuel (13 j en 2026), remis à zéro au 31 décembre. Solde = acquis − pris à fin du mois affiché. H. supp = total du mois.</div>
       </div>
     </div>
   </div>
@@ -263,41 +263,48 @@ function renderTable() {
 
 // Formatage jours (2,5 / 5 / -2,5)
 function fmtNum(n) { return Number.isInteger(n) ? String(n) : n.toFixed(1).replace('.', ','); }
-// Nb de mois acquis (≥0) du début d'acquisition jusqu'au mois affiché inclus
-function monthsAccrued(y, m) { return Math.max(0, (y * 12 + m) - (ACCRUAL_START.y * 12 + ACCRUAL_START.m) + 1); }
-// CP acquis à fin du mois affiché = report initial + 2,5 × mois écoulés
+// Index mensuel absolu
+function mIdx(y, m) { return y * 12 + m; }
+const ACCRUAL_IDX = mIdx(ACCRUAL_START.y, ACCRUAL_START.m);   // démarrage du suivi : juin 2026
+
+// --- CP : période de référence 1er juin → 31 mai, remise à zéro chaque 31 mai (non pris = perdus) ---
+// Début (juin) de la période de référence contenant (y,m).
+function cpRefStart(y, m) { return mIdx((m >= 5) ? y : y - 1, 5); }  // juin..déc → année y ; janv..mai → y-1
+// CP acquis à fin du mois affiché, DANS la période de référence courante.
+// Le report d'ouverture (solde au 31/05/2026) n'est appliqué qu'à la 1re période (démarrant en juin 2026).
 function cpAcquired(person, y, m) {
+  const viewIdx = mIdx(y, m);
   const op = (OPENING_BALANCE[person] && OPENING_BALANCE[person].cp) || 0;
-  return op + CP_PER_MONTH * monthsAccrued(y, m);
+  if (viewIdx < ACCRUAL_IDX) return op;                        // avant juin 2026 : on montre le report
+  const startIdx = Math.max(cpRefStart(y, m), ACCRUAL_IDX);
+  const months = Math.max(0, viewIdx - startIdx + 1);
+  const seed = (cpRefStart(y, m) <= ACCRUAL_IDX) ? op : 0;     // report seedé sur la 1re période uniquement
+  return seed + CP_PER_MONTH * months;
 }
-// RTT acquis à fin du mois affiché = (RTT de l'année civile / 12) × mois écoulés dans l'année.
-// Forfait jours : dotation recalculée chaque année et remise à zéro au 1er janvier (pas de report).
+
+// --- RTT : forfait jours, année civile, remise à zéro chaque 1er janvier (non pris = perdus) ---
 function rttAcquired(person, y, m) {
   return rttAnnualForYear(person, y) * (m + 1) / 12;
 }
-// Jours d'un type posés entre le début d'acquisition et la fin du mois affiché (cumul à date)
-function countTypeUpTo(person, type, y, m) {
+
+// Jours d'un type posés sur l'intervalle de mois [startIdx, endIdx] inclus
+function countTypeBetween(person, type, startIdx, endIdx) {
   const a = ABSENCES[person] || {};
-  const startIdx = ACCRUAL_START.y * 12 + ACCRUAL_START.m;
-  const viewIdx = y * 12 + m;
   let n = 0;
   for (const ds in a) {
     if (a[ds] !== type) continue;
-    const d = parseD(ds), idx = d.getFullYear() * 12 + d.getMonth();
-    if (idx >= startIdx && idx <= viewIdx) n++;
+    const d = parseD(ds), idx = mIdx(d.getFullYear(), d.getMonth());
+    if (idx >= startIdx && idx <= endIdx) n++;
   }
   return n;
 }
-// Jours d'un type posés dans l'année civile affichée jusqu'au mois inclus (pour les RTT, remis à zéro chaque an)
-function countTypeInYear(person, type, y, m) {
-  const a = ABSENCES[person] || {};
-  let n = 0;
-  for (const ds in a) {
-    if (a[ds] !== type) continue;
-    const d = parseD(ds);
-    if (d.getFullYear() === y && d.getMonth() <= m) n++;
-  }
-  return n;
+// CP pris dans la période de référence courante (juin→mai) jusqu'au mois affiché
+function cpTakenInRef(person, y, m) {
+  return countTypeBetween(person, 'CP', Math.max(cpRefStart(y, m), ACCRUAL_IDX), mIdx(y, m));
+}
+// RTT pris dans l'année civile affichée (1er janvier → mois affiché)
+function rttTakenInYear(person, y, m) {
+  return countTypeBetween(person, 'RTT', mIdx(y, 0), mIdx(y, m));
 }
 
 function renderCounters() {
@@ -309,7 +316,7 @@ function renderCounters() {
     const c = COLOR_HEX[COLLABORATORS[p].color];
     const canRtt = !!COLLABORATORS[p].rtt;
     const cpAcq = cpAcquired(p, currentYear, currentMonth);
-    const cpTaken = countTypeUpTo(p, 'CP', currentYear, currentMonth);
+    const cpTaken = cpTakenInRef(p, currentYear, currentMonth);
     const cpSolde = cpAcq - cpTaken;
     const ot = sumExtra(p, currentMonth);
     html += `<tr><td class="name" style="--c:${c}">${COLLABORATORS[p].shortName}</td>`;
@@ -317,7 +324,7 @@ function renderCounters() {
     html += `<td class="num" style="color:${cpSolde < 0 ? '#dc2626' : '#166534'}">${fmtNum(cpSolde)}</td>`;
     if (canRtt) {
       const rttAcq = rttAcquired(p, currentYear, currentMonth);
-      const rttTaken = countTypeInYear(p, 'RTT', currentYear, currentMonth);
+      const rttTaken = rttTakenInYear(p, currentYear, currentMonth);
       const rttSolde = rttAcq - rttTaken;
       html += `<td class="num">${fmtNum(rttAcq)}</td><td class="num">${fmtNum(rttTaken)}</td>`;
       html += `<td class="num" style="color:${rttSolde < 0 ? '#dc2626' : '#6d28d9'}">${fmtNum(rttSolde)}</td>`;
@@ -387,7 +394,7 @@ function downloadPDF() {
   const cBody = PEOPLE.map(p => {
     const canRtt = !!COLLABORATORS[p].rtt;
     const cpAcq = cpAcquired(p, currentYear, currentMonth);
-    const cpTaken = countTypeUpTo(p, 'CP', currentYear, currentMonth);
+    const cpTaken = cpTakenInRef(p, currentYear, currentMonth);
     const cpSolde = cpAcq - cpTaken;
     const ot = sumExtra(p, currentMonth);
     const row = [
@@ -396,7 +403,7 @@ function downloadPDF() {
       { content: fmtNum(cpSolde), styles: { fontStyle: 'bold', textColor: cpSolde < 0 ? [220,38,38] : [22,101,52] } },
     ];
     if (canRtt) {
-      const ra = rttAcquired(p, currentYear, currentMonth), rt = countTypeInYear(p, 'RTT', currentYear, currentMonth), rs = ra - rt;
+      const ra = rttAcquired(p, currentYear, currentMonth), rt = rttTakenInYear(p, currentYear, currentMonth), rs = ra - rt;
       row.push(fmtNum(ra), fmtNum(rt), { content: fmtNum(rs), styles: { fontStyle: 'bold', textColor: rs < 0 ? [220,38,38] : [109,40,217] } });
     } else {
       row.push({ content: '-', styles: grey }, { content: '-', styles: grey }, { content: '-', styles: grey });
