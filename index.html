@@ -679,7 +679,7 @@ function updateLeavePreview() {
   const tone = conf.length ? 'bg-amber-50 border-amber-200' : 'bg-emerald-50 border-emerald-200';
   let html = `<div class="rounded-xl border p-3 ${tone}"><div class="text-sm font-bold mb-1">${dates.length} jour(s) demandé(s) · ${working} ouvré(s)</div>`;
   if (!conf.length) {
-    html += `<div class="text-sm text-emerald-700">✅ Pas de souci — la personne pourra être remplacée.</div>`;
+    html += `<div class="text-sm text-emerald-700">✅ Sous réserve de validation, cela ne devrait pas poser de problème.</div>`;
   } else {
     html += `<div class="text-sm text-amber-800 font-semibold mb-1">⚠️ Dynah (renfort principal) est déjà absente :</div>`;
     html += `<ul class="text-xs space-y-1 text-amber-800">`;
