@@ -613,7 +613,9 @@ function openLeaveModal(preset) {
     if (e.target.classList.contains('leave-start')) {
       const i = e.target.dataset.i;
       const endEl = pc.querySelector(`.leave-end[data-i="${i}"]`);
-      if (endEl && !endEl.value) endEl.value = e.target.value;
+      // Synchronise la date de fin sur la date de début si elle est vide ou antérieure :
+      // évite à l'utilisateur de naviguer à nouveau jusqu'au bon mois pour une journée simple.
+      if (endEl && (!endEl.value || endEl.value < e.target.value)) endEl.value = e.target.value;
     }
     updateLeavePreview();
   });
@@ -694,16 +696,32 @@ function leaveTight(requester, dates) {
   }
   return out;
 }
+function joinNames(arr) {
+  const names = arr.map(SN);
+  if (names.length <= 1) return names.join('');
+  return names.slice(0, -1).join(', ') + ' & ' + names[names.length - 1];
+}
 function tightReason(c) {
   if (c.absentConcierges.length) {
-    const names = c.absentConcierges.map(SN).join(' & ');
-    return `${names} déjà absent·e — les 2 renforts seront mobilisés`;
+    return `${joinNames(c.absentConcierges)} déjà absent·e — les 2 renforts (Dynah & Charles) seront mobilisés`;
   }
   if (c.absentRenforts.length) {
-    const names = c.absentRenforts.map(SN).join(' & ');
-    return `${names} (renfort) déjà absent·e — l'autre renfort sera mobilisé`;
+    const otherRenf = c.absentRenforts.includes('Dynah') ? 'Charles' : 'Dynah';
+    return `${joinNames(c.absentRenforts)} (renfort) déjà absent·e — ${otherRenf} sera mobilisé pour vous remplacer`;
   }
   return 'couverture pile équilibrée';
+}
+function blockerReason(b) {
+  const renf = b.absentRenforts, conc = b.absentConcierges;
+  if (renf.length === 2) {
+    return `Dynah & Charles (les 2 renforts) déjà absents — plus aucun renfort disponible`;
+  }
+  if (renf.length === 1 && conc.length >= 1) {
+    const otherRenf = renf[0] === 'Dynah' ? 'Charles' : 'Dynah';
+    return `${SN(renf[0])} (renfort) et ${joinNames(conc)} déjà absent·e·s — ${otherRenf} est déjà mobilisé pour le remplacement`;
+  }
+  const all = [...renf, ...conc];
+  return `${joinNames(all)} déjà absent·e·s — plus assez de renforts pour vous remplacer`;
 }
 // Vrai si au moins une date demandée est à moins de 7 jours d'aujourd'hui
 function hasShortNotice(dates) {
@@ -734,7 +752,7 @@ function updateLeavePreview() {
     if (blockers.length) {
       html += `<div class="text-sm text-red-800 font-semibold mb-1">⛔ Congé impossible sur ces jours :</div>`;
       html += `<ul class="text-xs space-y-1 text-red-800 mb-2">`;
-      html += blockers.map(b => `<li><span class="font-semibold">${fmtFR(b.date)}</span> — un renfort et un concierge sont déjà absents, le second renfort est déjà mobilisé pour le remplacement</li>`).join('');
+      html += blockers.map(b => `<li><span class="font-semibold">${fmtFR(b.date)}</span> — ${blockerReason(b)}</li>`).join('');
       html += `</ul>`;
     }
     if (tight.length) {
@@ -765,8 +783,8 @@ function getLeaveEmail() {
   const blockers = leaveBlockers(requester, dates);
   const tight    = leaveTight(requester, dates);
   if (blockers.length) {
-    body += `\n⛔ Congé a priori impossible sur ces jours (un renfort et un concierge déjà absents, le second renfort est déjà en remplacement) :\n`;
-    body += blockers.map(b => `- ${fmtFR(b.date)}`).join('\n') + '\n';
+    body += `\n⛔ Congé a priori impossible sur ces jours :\n`;
+    body += blockers.map(b => `- ${fmtFR(b.date)} : ${blockerReason(b)}`).join('\n') + '\n';
   }
   if (tight.length) {
     body += `\n⚠️ Couverture tendue — demande très probablement refusée :\n`;
