@@ -73,6 +73,7 @@
     text-transform: uppercase; letter-spacing: 0.4px; line-height: 1;
   }
   .pill-reduced { background: #f59e0b; color: white; }
+  .pill-normal  { background: #e2e8f0; color: #475569; }
   .pill-holiday { background: #ef4444; color: white; }
 
   .day-head { display: flex; align-items: center; justify-content: space-between; gap: 4px; }
@@ -605,7 +606,9 @@ function renderDayCell(date, isCurrent, isToday) {
   const dayName = DAYS_FR[date.getDay()];
   html += `<div class="day-head"><span class="day-number"><span class="day-name">${dayName}</span>${dayNum}</span><div class="flex items-center gap-1 flex-wrap justify-end">`;
   if (isToday) html += `<span class="pill pill-today">Aujourd'hui</span>`;
-  if (sch.reduced && !sch.isWeekend && !sch.holiday) html += `<span class="pill pill-reduced">9h–17h</span>`;
+  if (!sch.isWeekend && !sch.holiday) {
+    html += sch.reduced ? `<span class="pill pill-reduced">9h–17h</span>` : `<span class="pill pill-normal">8h–19h</span>`;
+  }
   if (sch.holiday) html += `<span class="pill pill-holiday">Férié</span>`;
   html += `</div></div>`;
 
