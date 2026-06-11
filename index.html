@@ -73,8 +73,10 @@
   .pill-reduced { background: #f59e0b; color: white; }
   .pill-holiday { background: #ef4444; color: white; }
 
+  .day-head { display: flex; align-items: center; justify-content: space-between; gap: 4px; }
+  .day-name { display: none; font-weight: 600; color: #64748b; text-transform: capitalize; }
+  .day-buildings { display: flex; flex-direction: column; gap: 9px; }
   .bld-card { display: flex; flex-direction: column; gap: 4px; border: 1px solid #e2e8f0; border-radius: 12px; padding: 7px 7px 8px; }
-  .bld-card + .bld-card { margin-top: 9px; }
   .bld-card.tb3 { background: rgba(238,242,255,0.8); border-color: #c7d2fe; }
   .bld-card.tb4 { background: rgba(240,253,250,0.85); border-color: #99f6e4; }
   .bld-label {
@@ -212,12 +214,46 @@
     .glass { background: white; backdrop-filter: none; box-shadow: none; }
   }
   @media (max-width: 1100px) { aside.sidebar { order: -1; } }
-  @media (max-width: 700px) {
-    .day-cell { min-height: 160px; padding: 8px; }
-    .day-number { font-size: 14px; }
-    .shift-bar { font-size: 11.5px; min-height: 24px; padding: 5px 8px; }
-    .shift-bar .name { font-size: 12px; }
+  /* Grand desktop → laptop : on resserre la grille 7 colonnes */
+  @media (max-width: 1280px) and (min-width: 901px) {
+    .day-cell { min-height: 170px; padding: 7px; gap: 5px; }
+    .day-number { font-size: 15px; }
+    .shift-bar { font-size: 11px; min-height: 22px; padding: 4px 7px; gap: 4px; }
+    .shift-bar .when { font-size: 9px; }
+    .shift-bar .name { font-size: 11px; }
+    .shift-bar .sub-note { font-size: 8.5px; }
     .bld-label { font-size: 9px; }
+    .bld-card { padding: 5px; }
+    .off-row { font-size: 10px; padding: 2px 7px; min-height: 18px; }
+    .mng-chip { font-size: 9px; padding: 1px 6px; }
+  }
+  /* Tablette & mobile : vue agenda — 1 jour par ligne, plein largeur */
+  @media (max-width: 900px) {
+    .calendar-grid { grid-template-columns: 1fr; gap: 8px; }
+    .day-header { display: none; }
+    .day-cell { min-height: 0; padding: 12px 14px; gap: 10px; }
+    .day-cell.other-month { display: none; }
+    .day-name { display: inline; margin-right: 8px; font-size: 14px; }
+    .day-number { font-size: 18px; }
+    .day-cell.weekend, .day-cell.holiday {
+      flex-direction: row; align-items: center; padding: 10px 16px; gap: 12px;
+    }
+    .day-cell.weekend > div:last-child, .day-cell.holiday > div:last-child { margin: 0; }
+    /* TB3 et TB4 côte à côte */
+    .day-buildings { flex-direction: row; gap: 8px; }
+    .day-buildings .bld-card { flex: 1; min-width: 0; padding: 8px; }
+    .shift-bar { font-size: 12px; min-height: 26px; padding: 5px 9px; }
+    .shift-bar .name { font-size: 12px; }
+    .shift-bar .when { font-size: 10px; }
+    .off-row { font-size: 11px; }
+    .mng-chip { font-size: 10.5px; padding: 2px 8px; }
+    /* Header plus compact */
+    header.glass { padding: 10px 12px; }
+    header.glass h1 { font-size: 15px; }
+    header.glass p { font-size: 11px; }
+    /* Modal congé */
+    .leave-row { flex-wrap: wrap; }
+    .leave-row > div { min-width: calc(50% - 28px); }
   }
   button:focus-visible { outline: 2px solid #3b82f6; outline-offset: 2px; border-radius: 8px; }
 
@@ -494,7 +530,8 @@ function renderDayCell(date, isCurrent, isToday) {
   let html = `<div class="${cls.join(' ')}">`;
   if (sch.warnings && sch.warnings.length) html += `<div class="warning-flag" title="${sch.warnings.join(' · ')}">!</div>`;
 
-  html += `<div class="flex items-center justify-between gap-1"><span class="day-number">${dayNum}</span><div class="flex items-center gap-1 flex-wrap justify-end">`;
+  const dayName = DAYS_FR[date.getDay()];
+  html += `<div class="day-head"><span class="day-number"><span class="day-name">${dayName}</span>${dayNum}</span><div class="flex items-center gap-1 flex-wrap justify-end">`;
   if (sch.reduced && !sch.isWeekend && !sch.holiday) html += `<span class="pill pill-reduced">9h–17h</span>`;
   if (sch.holiday) html += `<span class="pill pill-holiday">Férié</span>`;
   html += `</div></div>`;
@@ -502,8 +539,10 @@ function renderDayCell(date, isCurrent, isToday) {
   if (sch.isWeekend) return html + `<div class="text-[11px] text-slate-400 italic mt-2">Weekend</div></div>`;
   if (sch.holiday)   return html + `<div class="text-[11px] text-red-600 font-semibold mt-1">${sch.holiday}</div></div>`;
 
+  html += `<div class="day-buildings">`;
   html += renderBuildingMini('TB3', sch.TB3, sch.date);
   html += renderBuildingMini('TB4', sch.TB4, sch.date);
+  html += `</div>`;
   html += renderManagers(sch.date);
   html += `</div>`;
   return html;
