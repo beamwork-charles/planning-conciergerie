@@ -79,6 +79,32 @@
     table.ts td.name, table.ts th.name { position: static; }
     * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
   }
+
+  /* Alertes congés à poser avant échéance */
+  .alert-card {
+    border-radius: 16px; padding: 12px 16px; margin-bottom: 18px;
+    border: 1px solid; display: flex; flex-direction: column; gap: 8px;
+  }
+  .alert-card.lvl-info  { background: #eff6ff; border-color: #bfdbfe; }
+  .alert-card.lvl-amber { background: #fffbeb; border-color: #fde68a; }
+  .alert-card.lvl-red   { background: #fef2f2; border-color: #fecaca; }
+  .alert-head { display: flex; align-items: center; gap: 8px; font-weight: 800; font-size: 13px; }
+  .alert-card.lvl-info  .alert-head { color: #1d4ed8; }
+  .alert-card.lvl-amber .alert-head { color: #b45309; }
+  .alert-card.lvl-red   .alert-head { color: #b91c1c; }
+  .alert-line { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 10px; font-size: 12.5px; }
+  .alert-line .al-label { font-weight: 700; color: #334155; }
+  .alert-line .al-deadline { font-weight: 800; }
+  .alert-card.lvl-info  .al-deadline { color: #1d4ed8; }
+  .alert-card.lvl-amber .al-deadline { color: #b45309; }
+  .alert-card.lvl-red   .al-deadline { color: #b91c1c; }
+  .al-chip {
+    display: inline-flex; align-items: baseline; gap: 4px;
+    padding: 2px 8px; border-radius: 999px; background: rgba(255,255,255,.75);
+    border: 1px solid rgba(15,23,42,.08); font-size: 12px; color: #0f172a;
+  }
+  .al-chip b { font-weight: 800; }
+  .al-days { font-size: 11px; color: #64748b; font-weight: 600; }
 </style>
 </head>
 <body>
@@ -122,6 +148,9 @@
       <a href="index.html" class="px-3 py-2 rounded-lg bg-white border border-slate-200 hover:bg-slate-50 text-sm font-semibold flex items-center gap-1.5">📅 Planning</a>
     </div>
   </header>
+
+  <!-- Alertes : congés à poser avant échéance -->
+  <div id="expiry-alerts" class="no-print"></div>
 
   <!-- Feuille imprimable -->
   <div class="sheet">
@@ -212,9 +241,52 @@ function render() {
   document.getElementById('period-label').textContent = `${MONTHS_FR[currentMonth]} ${currentYear}`;
   document.getElementById('sheet-month').textContent = `${MONTHS_FR[currentMonth]} ${currentYear}`;
   document.getElementById('prev-btn').style.visibility = atMin() ? 'hidden' : 'visible';
+  renderExpiryAlerts();
   renderTable();
   renderCounters();
   renderLegend();
+}
+
+// ----- Alertes : congés à poser avant échéance (basées sur la date du jour) -----
+// CP perdus au 31/05 (fin de période de référence) ; RTT perdus au 31/12 (année civile).
+function nextOccurrence(month, day) {           // prochaine date month/day (mois 0-indexé) >= aujourd'hui
+  let dl = new Date(today.getFullYear(), month, day);
+  if (dl < today) dl = new Date(today.getFullYear() + 1, month, day);
+  return dl;
+}
+function alertLevel(daysLeft) { return daysLeft <= 30 ? 'red' : daysLeft <= 90 ? 'amber' : 'info'; }
+function alertIcon(level)     { return level === 'red' ? '⛔' : level === 'amber' ? '⏰' : '📅'; }
+
+function renderExpiryAlerts() {
+  const ty = today.getFullYear(), tm = today.getMonth();
+  const groups = [];
+
+  // CP — échéance 31 mai (solde de la période de référence en cours)
+  const cpPeople = PEOPLE
+    .map(p => ({ p, solde: cpAcquired(p, ty, tm) - cpTakenInRef(p, ty, tm) }))
+    .filter(x => x.solde > 0.01).sort((a, b) => b.solde - a.solde);
+  if (cpPeople.length) groups.push({ type: 'CP', deadline: nextOccurrence(4, 31), people: cpPeople });
+
+  // RTT — échéance 31 décembre (cadres au forfait : Charles)
+  const rttPeople = PEOPLE.filter(p => COLLABORATORS[p].rtt)
+    .map(p => ({ p, solde: rttAcquired(p, ty, tm) - rttTakenInYear(p, ty, tm) }))
+    .filter(x => x.solde > 0.01).sort((a, b) => b.solde - a.solde);
+  if (rttPeople.length) groups.push({ type: 'RTT', deadline: nextOccurrence(11, 31), people: rttPeople });
+
+  const box = document.getElementById('expiry-alerts');
+  if (!groups.length) { box.innerHTML = ''; return; }
+
+  box.innerHTML = groups.map(g => {
+    const daysLeft = Math.round((g.deadline - today) / 86400000);
+    const level = alertLevel(daysLeft);
+    const chips = g.people.map(x =>
+      `<span class="al-chip" style="border-left:3px solid ${COLOR_HEX[COLLABORATORS[x.p].color]}">${COLLABORATORS[x.p].shortName} <b>${fmtNum(x.solde)} j</b></span>`
+    ).join('');
+    return `<div class="alert-card lvl-${level}">
+      <div class="alert-head">${alertIcon(level)}&nbsp;<span>${g.type} à poser avant le <span class="al-deadline">${fmtFR(fmt(g.deadline))}</span></span><span class="al-days">· dans ${daysLeft} j</span></div>
+      <div class="alert-line"><span class="al-label">À planifier :</span> ${chips}</div>
+    </div>`;
+  }).join('');
 }
 
 function renderTable() {
