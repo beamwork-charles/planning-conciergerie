@@ -111,6 +111,25 @@
     border: 1px dashed color-mix(in srgb, var(--c) 50%, transparent);
   }
 
+  /* Managers strip (bottom of day cell) */
+  .mng-row {
+    display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px;
+    padding-top: 6px; border-top: 1px dashed #e2e8f0;
+  }
+  .mng-chip {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 2px 7px; border-radius: 999px;
+    font-size: 10px; font-weight: 700; line-height: 1.2;
+  }
+  .mng-chip::before {
+    content: ''; width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0;
+  }
+  .mng-chip.on  { background: #ecfdf5; color: #065f46; border: 1px solid #a7f3d0; }
+  .mng-chip.on::before  { background: #10b981; box-shadow: 0 0 0 2px rgba(16,185,129,.18); }
+  .mng-chip.off { background: #f1f5f9; color: #64748b; border: 1px solid #e2e8f0; text-decoration: line-through; text-decoration-color: #94a3b8; }
+  .mng-chip.off::before { background: #cbd5e1; }
+  .mng-chip.off::after  { content: ' · OFF'; text-decoration: none; font-weight: 800; letter-spacing: .3px; }
+
   .warning-flag {
     position: absolute; top: 8px; right: 8px; width: 18px; height: 18px;
     background: #ef4444; color: white; border-radius: 50%;
@@ -463,8 +482,19 @@ function renderDayCell(date, isCurrent, isToday) {
 
   html += renderBuildingMini('TB3', sch.TB3, sch.date);
   html += renderBuildingMini('TB4', sch.TB4, sch.date);
+  html += renderManagers(sch.date);
   html += `</div>`;
   return html;
+}
+
+function renderManagers(dateStr) {
+  const managers = ['Charles', 'Dynah'];
+  const chips = managers.map(p => {
+    const off = isAbsent(p, dateStr);
+    const nm = SN(p);
+    return `<span class="mng-chip ${off ? 'off' : 'on'}" title="${nm} — ${off ? 'OFF' : 'présent'}">${nm}</span>`;
+  }).join('');
+  return `<div class="mng-row" aria-label="Managers">${chips}</div>`;
 }
 
 function renderBuildingMini(name, blk, dateStr) {
