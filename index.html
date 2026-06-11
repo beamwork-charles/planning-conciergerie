@@ -656,40 +656,54 @@ function collectDates(periods) {
   }
   return [...set].sort();
 }
-function leaveConflicts(requester, dates) {
-  // Avertissement souple : Dynah (renfort n°1) est déjà absente un jour ouvré demandé.
-  // Si Dynah est présente, la personne pourra être remplacée → pas de message inutile.
-  // Si le demandeur est Dynah elle-même, sa propre absence n'est pas encore enregistrée → on ne déclenche pas.
+// Pour chaque date demandée : qui est déjà absent ce jour-là (hors demandeur) ?
+function dayCoverage(requester, dateStr) {
+  const role = COLLABORATORS[requester]?.role;
+  const reqRenf = role === 'renfort'   ? 1 : 0;
+  const reqConc = role === 'concierge' ? 1 : 0;
+  const absentRenforts = [], absentConcierges = [];
+  for (const p of Object.keys(COLLABORATORS)) {
+    if (p === requester) continue;
+    if (!isAbsent(p, dateStr)) continue;
+    if (COLLABORATORS[p].role === 'renfort')  absentRenforts.push(p);
+    else if (COLLABORATORS[p].role === 'concierge') absentConcierges.push(p);
+  }
+  const renfAvailable = 2 - absentRenforts.length - reqRenf;
+  const need = absentConcierges.length + reqConc;
+  return { absentRenforts, absentConcierges, renfAvailable, need, reqRenf, reqConc };
+}
+// Couverture IMPOSSIBLE (rouge) : pas assez de renforts pour couvrir les concierges absents + le demandeur
+function leaveBlockers(requester, dates) {
   const out = [];
   for (const d of dates) {
     if (!isWorkday(parseD(d))) continue;
-    if (requester === 'Dynah') continue;
-    if (isAbsent('Dynah', d)) out.push({ date: d });
+    const c = dayCoverage(requester, d);
+    if (c.renfAvailable < c.need) out.push({ date: d, ...c });
   }
   return out;
 }
-// Couverture impossible : un renfort déjà absent + un concierge déjà absent
-// (le 2nd renfort est déjà en remplacement, plus personne pour couvrir le demandeur).
-// On bloque pour un demandeur concierge OU renfort dans ces cas.
-function leaveBlockers(requester, dates) {
-  const role = COLLABORATORS[requester]?.role;
-  const reqRenf = role === 'renfort' ? 1 : 0;
-  const reqConc = role === 'concierge' ? 1 : 0;
+// Couverture TENDUE (orange) : pile équilibrée — les 2 renforts seront mobilisés, demande très probablement refusée
+function leaveTight(requester, dates) {
   const out = [];
   for (const d of dates) {
     if (!isWorkday(parseD(d))) continue;
-    let absRenf = 0, absConc = 0;
-    for (const p of Object.keys(COLLABORATORS)) {
-      if (p === requester) continue;
-      if (!isAbsent(p, d)) continue;
-      if (COLLABORATORS[p].role === 'renfort')  absRenf++;
-      else if (COLLABORATORS[p].role === 'concierge') absConc++;
+    const c = dayCoverage(requester, d);
+    if (c.renfAvailable === c.need && c.need > 0 && (c.absentRenforts.length + c.absentConcierges.length) > 0) {
+      out.push({ date: d, ...c });
     }
-    const renfAvailable = 2 - absRenf - reqRenf;
-    const need = absConc + reqConc;
-    if (renfAvailable < need) out.push({ date: d, absRenf, absConc });
   }
   return out;
+}
+function tightReason(c) {
+  if (c.absentConcierges.length) {
+    const names = c.absentConcierges.map(SN).join(' & ');
+    return `${names} déjà absent·e — les 2 renforts seront mobilisés`;
+  }
+  if (c.absentRenforts.length) {
+    const names = c.absentRenforts.map(SN).join(' & ');
+    return `${names} (renfort) déjà absent·e — l'autre renfort sera mobilisé`;
+  }
+  return 'couverture pile équilibrée';
 }
 // Vrai si au moins une date demandée est à moins de 7 jours d'aujourd'hui
 function hasShortNotice(dates) {
@@ -705,14 +719,14 @@ function updateLeavePreview() {
   const box = document.getElementById('leave-preview');
   if (!dates.length) { box.innerHTML = `<div class="text-sm text-slate-400">Sélectionnez au moins une date pour voir le récapitulatif.</div>`; return; }
   const working = dates.filter(d => isWorkday(parseD(d))).length;
-  const conf = leaveConflicts(requester, dates);
   const shortNotice = hasShortNotice(dates);
   const blockers = leaveBlockers(requester, dates);
-  const hasIssue = conf.length || shortNotice || blockers.length;
+  const tight    = leaveTight(requester, dates);
+  const hasIssue = shortNotice || blockers.length || tight.length;
   let tone;
   if (blockers.length) tone = 'bg-red-50 border-red-200';
-  else if (hasIssue) tone = 'bg-amber-50 border-amber-200';
-  else tone = 'bg-emerald-50 border-emerald-200';
+  else if (hasIssue)   tone = 'bg-amber-50 border-amber-200';
+  else                 tone = 'bg-emerald-50 border-emerald-200';
   let html = `<div class="rounded-xl border p-3 ${tone}"><div class="text-sm font-bold mb-1">${dates.length} jour(s) demandé(s) · ${working} ouvré(s)</div>`;
   if (!hasIssue) {
     html += `<div class="text-sm text-emerald-700">✅ Sous réserve de validation, cela ne devrait pas poser de problème.</div>`;
@@ -723,18 +737,14 @@ function updateLeavePreview() {
       html += blockers.map(b => `<li><span class="font-semibold">${fmtFR(b.date)}</span> — un renfort et un concierge sont déjà absents, le second renfort est déjà mobilisé pour le remplacement</li>`).join('');
       html += `</ul>`;
     }
-    if (shortNotice) {
-      html += `<div class="text-sm text-amber-800 font-semibold ${blockers.length ? 'mt-2 ' : ''}mb-1">⏰ Demande à moins de 7 jours — cela peut compliquer l'organisation du planning.</div>`;
-    }
-    // Évite de répéter l'info "Dynah absente" sur les jours déjà signalés comme bloqués
-    const blockedDates = new Set(blockers.map(b => b.date));
-    const dynahOnly = conf.filter(c => !blockedDates.has(c.date));
-    if (dynahOnly.length) {
-      html += `<div class="text-sm text-amber-800 font-semibold ${(blockers.length || shortNotice) ? 'mt-2 ' : ''}mb-1">⚠️ Dynah (renfort principal) est déjà absente :</div>`;
+    if (tight.length) {
+      html += `<div class="text-sm text-amber-800 font-semibold ${blockers.length ? 'mt-2 ' : ''}mb-1">⚠️ Couverture tendue — demande très probablement refusée :</div>`;
       html += `<ul class="text-xs space-y-1 text-amber-800">`;
-      html += dynahOnly.map(c => `<li><span class="font-semibold">${fmtFR(c.date)}</span></li>`).join('');
+      html += tight.map(t => `<li><span class="font-semibold">${fmtFR(t.date)}</span> — ${tightReason(t)}</li>`).join('');
       html += `</ul>`;
-      html += `<div class="text-xs text-amber-700 mt-2">À vérifier avec Charles pour la couverture.</div>`;
+    }
+    if (shortNotice) {
+      html += `<div class="text-sm text-amber-800 font-semibold ${(blockers.length || tight.length) ? 'mt-2 ' : ''}mb-1">⏰ Demande à moins de 7 jours — cela peut compliquer l'organisation du planning.</div>`;
     }
   }
   return box.innerHTML = html + `</div>`;
@@ -751,22 +761,19 @@ function getLeaveEmail() {
     const end = (p.end && p.end >= p.start) ? p.end : p.start;
     return p.start === end ? `- le ${fmtFR(p.start)}` : `- du ${fmtFR(p.start)} au ${fmtFR(end)}`;
   });
-  const conf = leaveConflicts(requester, dates);
   let body = `Bonjour Charles,\n\nJe souhaite poser des congés :\n${periodLines.join('\n')}\n\nTotal : ${dates.length} jour(s), dont ${working} jour(s) ouvré(s).\n`;
   const blockers = leaveBlockers(requester, dates);
+  const tight    = leaveTight(requester, dates);
   if (blockers.length) {
     body += `\n⛔ Congé a priori impossible sur ces jours (un renfort et un concierge déjà absents, le second renfort est déjà en remplacement) :\n`;
     body += blockers.map(b => `- ${fmtFR(b.date)}`).join('\n') + '\n';
   }
+  if (tight.length) {
+    body += `\n⚠️ Couverture tendue — demande très probablement refusée :\n`;
+    body += tight.map(t => `- ${fmtFR(t.date)} : ${tightReason(t)}`).join('\n') + '\n';
+  }
   if (hasShortNotice(dates)) {
     body += `\n⏰ Demande à moins de 7 jours — cela peut compliquer l'organisation du planning.\n`;
-  }
-  const blockedDates = new Set(blockers.map(b => b.date));
-  const dynahOnly = conf.filter(c => !blockedDates.has(c.date));
-  if (dynahOnly.length) {
-    body += `\nPoint de vigilance : Dynah (renfort principal) est déjà absente sur ces jours :\n`;
-    body += dynahOnly.map(c => `- ${fmtFR(c.date)}`).join('\n') + '\n';
-    body += `Merci de vérifier la couverture avec Charles.\n`;
   }
   if (msg) body += `\nMessage : ${msg}\n`;
   body += `\nBien cordialement,\n${name}`;
