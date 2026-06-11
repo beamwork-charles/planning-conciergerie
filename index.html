@@ -657,20 +657,14 @@ function collectDates(periods) {
   return [...set].sort();
 }
 function leaveConflicts(requester, dates) {
-  const partner = PARTNER[requester], out = [];
+  // Règle : on n'alerte que si Dynah (renfort n°1) est déjà absente un jour ouvré demandé.
+  // Si Dynah est présente, la personne pourra être remplacée → pas de message inutile.
+  // Si le demandeur est Dynah elle-même, sa propre absence n'est pas encore enregistrée → on ne déclenche pas.
+  const out = [];
   for (const d of dates) {
-    const dt = parseD(d);
-    if (!isWorkday(dt)) continue;
-    const others = Object.keys(COLLABORATORS).filter(p => p !== requester && isAbsent(p, d));
-    if (!others.length) continue;
-    let sev = 'warning'; const notes = [];
-    if (partner && others.includes(partner)) { sev = 'critical'; notes.push(`${SN(partner)} (binôme ${COLLABORATORS[requester].building}) déjà absent·e`); }
-    const renf = others.filter(o => COLLABORATORS[o].role === 'renfort');
-    if (renf.length === 2) { sev = 'critical'; notes.push('les 2 renforts (Dynah & Charles) absents'); }
-    else if (renf.length === 1) notes.push(`${SN(renf[0])} (renfort) absent·e`);
-    const otherC = others.filter(o => COLLABORATORS[o].role === 'concierge' && o !== partner);
-    if (otherC.length) notes.push(`${otherC.map(SN).join(', ')} absent·e·s`);
-    out.push({ date: d, sev, notes });
+    if (!isWorkday(parseD(d))) continue;
+    if (requester === 'Dynah') continue;
+    if (isAbsent('Dynah', d)) out.push({ date: d });
   }
   return out;
 }
@@ -682,16 +676,16 @@ function updateLeavePreview() {
   if (!dates.length) { box.innerHTML = `<div class="text-sm text-slate-400">Sélectionnez au moins une date pour voir le récapitulatif.</div>`; return; }
   const working = dates.filter(d => isWorkday(parseD(d))).length;
   const conf = leaveConflicts(requester, dates);
-  const hasCrit = conf.some(c => c.sev === 'critical');
-  const tone = hasCrit ? 'bg-red-50 border-red-200' : conf.length ? 'bg-amber-50 border-amber-200' : 'bg-emerald-50 border-emerald-200';
+  const tone = conf.length ? 'bg-amber-50 border-amber-200' : 'bg-emerald-50 border-emerald-200';
   let html = `<div class="rounded-xl border p-3 ${tone}"><div class="text-sm font-bold mb-1">${dates.length} jour(s) demandé(s) · ${working} ouvré(s)</div>`;
   if (!conf.length) {
-    html += `<div class="text-sm text-emerald-700">✅ Aucun chevauchement avec une absence connue.</div>`;
+    html += `<div class="text-sm text-emerald-700">✅ Pas de souci — la personne pourra être remplacée.</div>`;
   } else {
-    html += `<div class="text-sm ${hasCrit ? 'text-red-800' : 'text-amber-800'} font-semibold mb-1">${hasCrit ? '⛔' : '⚠️'} Chevauchement(s) détecté(s) :</div>`;
-    html += `<ul class="text-xs space-y-1 ${hasCrit ? 'text-red-700' : 'text-amber-800'}">`;
-    html += conf.map(c => `<li><span class="font-semibold">${fmtFR(c.date)}</span> — ${c.notes.join(' ; ')}</li>`).join('');
+    html += `<div class="text-sm text-amber-800 font-semibold mb-1">⚠️ Dynah (renfort principal) est déjà absente :</div>`;
+    html += `<ul class="text-xs space-y-1 text-amber-800">`;
+    html += conf.map(c => `<li><span class="font-semibold">${fmtFR(c.date)}</span></li>`).join('');
     html += `</ul>`;
+    html += `<div class="text-xs text-amber-700 mt-2">À vérifier avec Charles pour la couverture.</div>`;
   }
   return box.innerHTML = html + `</div>`;
 }
@@ -710,8 +704,9 @@ function getLeaveEmail() {
   const conf = leaveConflicts(requester, dates);
   let body = `Bonjour Charles,\n\nJe souhaite poser des congés :\n${periodLines.join('\n')}\n\nTotal : ${dates.length} jour(s), dont ${working} jour(s) ouvré(s).\n`;
   if (conf.length) {
-    body += `\nPoints de vigilance (chevauchement avec des absences connues) :\n`;
-    body += conf.map(c => `- ${fmtFR(c.date)} : ${c.notes.join(' ; ')}`).join('\n') + '\n';
+    body += `\nPoint de vigilance : Dynah (renfort principal) est déjà absente sur ces jours :\n`;
+    body += conf.map(c => `- ${fmtFR(c.date)}`).join('\n') + '\n';
+    body += `Merci de vérifier la couverture avec Charles.\n`;
   }
   if (msg) body += `\nMessage : ${msg}\n`;
   body += `\nBien cordialement,\n${name}`;
