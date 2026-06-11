@@ -56,8 +56,11 @@ const COLOR_HEX = {
 // ===== Calendrier =====
 // Semaine de référence 08-14/06/2026 → Flora & Cédric matin, Émilie & Chiara soir
 const REF_MONDAY    = new Date(2026, 5, 8);
-const REDUCED_START = new Date(2026, 6, 13);   // 13/07/2026
-const REDUCED_END   = new Date(2026, 7, 28);   // 28/08/2026
+// Périodes en horaires réduits (9h-17h)
+const REDUCED_PERIODS = [
+  { start: new Date(2026, 6, 13), end: new Date(2026, 7, 28) },   // été : 13/07 → 28/08/2026
+  { start: new Date(2026, 11, 21), end: new Date(2027, 0, 1) }    // fêtes : 21/12/2026 → 01/01/2027
+];
 const MIN_Y = 2026, MIN_M = 5;                 // juin 2026 = premier mois visible
 
 // ===== Absences (pointage) =====
@@ -75,7 +78,19 @@ const ABSENCES = {
     '2026-09-09': 'CP', '2026-09-10': 'CP', '2026-09-11': 'CP',
     '2026-09-21': 'CP'
   },
-  Charles: { '2026-06-15': 'CP', '2026-06-16': 'CP', '2026-06-17': 'CP', '2026-06-18': 'CP', '2026-06-19': 'CP' }
+  Charles: {
+    '2026-06-15': 'CP', '2026-06-16': 'CP', '2026-06-17': 'CP', '2026-06-18': 'CP', '2026-06-19': 'CP',
+    '2026-09-21': 'CP', '2026-09-22': 'CP', '2026-09-23': 'CP', '2026-09-24': 'CP', '2026-09-25': 'CP',
+    '2026-09-26': 'CP', '2026-09-27': 'CP', '2026-09-28': 'CP', '2026-09-29': 'CP', '2026-09-30': 'CP',
+    '2026-10-01': 'CP', '2026-10-02': 'CP', '2026-10-03': 'CP', '2026-10-04': 'CP', '2026-10-05': 'CP',
+    '2026-10-06': 'CP', '2026-10-07': 'CP', '2026-10-08': 'CP', '2026-10-09': 'CP', '2026-10-10': 'CP',
+    '2026-10-11': 'CP', '2026-10-12': 'CP', '2026-10-13': 'CP', '2026-10-14': 'CP', '2026-10-15': 'CP',
+    '2026-10-16': 'CP', '2026-10-17': 'CP', '2026-10-18': 'CP', '2026-10-19': 'CP', '2026-10-20': 'CP',
+    '2026-10-21': 'CP', '2026-10-22': 'CP', '2026-10-23': 'CP', '2026-10-24': 'CP', '2026-10-25': 'CP',
+    '2026-10-26': 'CP', '2026-10-27': 'CP', '2026-10-28': 'CP', '2026-10-29': 'CP', '2026-10-30': 'CP',
+    '2026-10-31': 'CP',
+    '2026-11-01': 'CP', '2026-11-02': 'CP', '2026-11-03': 'CP', '2026-11-04': 'CP'
+  }
 };
 
 // Libellés des types de pointage
@@ -120,7 +135,8 @@ const HOLIDAYS_2026 = {
   '2026-01-01': "Jour de l'An", '2026-04-06': 'Lundi de Pâques', '2026-05-01': 'Fête du Travail',
   '2026-05-08': 'Victoire 1945', '2026-05-14': 'Ascension', '2026-05-25': 'Lundi de Pentecôte',
   '2026-07-14': 'Fête nationale', '2026-08-15': 'Assomption', '2026-11-01': 'Toussaint',
-  '2026-11-11': 'Armistice', '2026-12-25': 'Noël'
+  '2026-11-11': 'Armistice', '2026-12-25': 'Noël',
+  '2027-01-01': "Jour de l'An"
 };
 
 const MONTHS_FR = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
@@ -152,7 +168,10 @@ function isBridgeDay(d) {
   return false;
 }
 // Horaires réduits : période 13/07–28/08 OU jour de pont
-function isReducedDay(d) { return (d >= REDUCED_START && d <= REDUCED_END) || isBridgeDay(d); }
+function isReducedDay(d) {
+  for (const p of REDUCED_PERIODS) if (d >= p.start && d <= p.end) return true;
+  return isBridgeDay(d);
+}
 function getWeekParity(d) {
   const monday = new Date(d);
   monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7));

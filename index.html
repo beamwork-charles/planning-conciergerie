@@ -360,8 +360,11 @@ let currentMonth = today.getMonth(), currentYear = today.getFullYear();
 // Planning : historique limité aux 3 derniers mois (glissant par rapport au mois courant)
 const mIdx = (y, m) => y * 12 + m;
 const PLANNING_FLOOR = mIdx(today.getFullYear(), today.getMonth()) - 3;
+const PLANNING_CEIL  = mIdx(today.getFullYear(), today.getMonth()) + 6;
 if (mIdx(currentYear, currentMonth) < PLANNING_FLOOR) { currentYear = Math.floor(PLANNING_FLOOR / 12); currentMonth = PLANNING_FLOOR % 12; }
+if (mIdx(currentYear, currentMonth) > PLANNING_CEIL)  { currentYear = Math.floor(PLANNING_CEIL  / 12); currentMonth = PLANNING_CEIL  % 12; }
 function atMin() { return mIdx(currentYear, currentMonth) <= PLANNING_FLOOR; }
+function atMax() { return mIdx(currentYear, currentMonth) >= PLANNING_CEIL;  }
 
 // ----- Schedule generation (helpers de dates : voir data.js) -----
 function genDay(date) {
@@ -490,6 +493,7 @@ function collectWarnings(sch) {
 function render() {
   renderHeader(); renderCalendar(); renderStatusLine();
   document.getElementById('prev-btn').style.visibility = atMin() ? 'hidden' : 'visible';
+  document.getElementById('next-btn').style.visibility = atMax() ? 'hidden' : 'visible';
 }
 function renderHeader() { document.getElementById('period-label').textContent = `${MONTHS_FR[currentMonth]} ${currentYear}`; }
 function renderStatusLine() {
@@ -878,7 +882,7 @@ document.addEventListener('keydown', (e) => {
 
 // ----- Navigation -----
 function prevMonth() { if (atMin()) return; if (--currentMonth < 0) { currentMonth = 11; currentYear--; } render(); }
-function nextMonth() { if (++currentMonth > 11) { currentMonth = 0; currentYear++; } render(); }
+function nextMonth() { if (atMax()) return; if (++currentMonth > 11) { currentMonth = 0; currentYear++; } render(); }
 document.getElementById('prev-btn').addEventListener('click', prevMonth);
 document.getElementById('next-btn').addEventListener('click', nextMonth);
 document.getElementById('leave-btn').addEventListener('click', () => openLeaveModal());
