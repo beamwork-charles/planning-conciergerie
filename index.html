@@ -470,7 +470,7 @@ function renderDayCell(date, isCurrent, isToday) {
 function renderBuildingMini(name, blk, dateStr) {
   let html = `<div class="bld-card ${name.toLowerCase()}"><div class="bld-label">${name}</div>`;
   if (blk.slots) html += blk.slots.map(s => renderShiftBar(s, '9h-18h')).join('');
-  else { html += renderShiftBar(blk.morning, 'Matin'); html += renderShiftBar(blk.evening, 'Soir'); }
+  else { html += renderShiftBar(blk.morning, blk.morning.time); html += renderShiftBar(blk.evening, blk.evening.time); }
   html += renderExtraHours(dateStr, name);
   return html + `</div>`;
 }
