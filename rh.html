@@ -141,7 +141,7 @@
       <div>
         <div class="text-xs font-extrabold uppercase tracking-wider text-slate-500 mb-2">Compteurs</div>
         <table class="counters" id="counters-table"></table>
-        <div class="text-[10px] text-slate-400 mt-1">CP acquis : 2,5 j/mois depuis juin 2026 (+ report initial). RTT : dotation annuelle (Charles). Solde = acquis − pris, à fin du mois affiché. H. supp = total du mois.</div>
+        <div class="text-[10px] text-slate-400 mt-1">Soldes au 31/05/2026 en report. CP acquis : 2,5 j/mois dès juin 2026. RTT (Charles) : 13 j/an au prorata mensuel. Solde = acquis − pris, à fin du mois affiché. H. supp = total du mois.</div>
       </div>
     </div>
   </div>
@@ -270,6 +270,11 @@ function cpAcquired(person, y, m) {
   const op = (OPENING_BALANCE[person] && OPENING_BALANCE[person].cp) || 0;
   return op + CP_PER_MONTH * monthsAccrued(y, m);
 }
+// RTT acquis à fin du mois affiché = report initial + (dotation annuelle / 12) × mois écoulés
+function rttAcquired(person, y, m) {
+  const op = (OPENING_BALANCE[person] && OPENING_BALANCE[person].rtt) || 0;
+  return op + ((RTT_ANNUAL[person] || 0) / 12) * monthsAccrued(y, m);
+}
 // Jours d'un type posés entre le début d'acquisition et la fin du mois affiché (cumul à date)
 function countTypeUpTo(person, type, y, m) {
   const a = ABSENCES[person] || {};
@@ -300,7 +305,7 @@ function renderCounters() {
     html += `<td class="num">${fmtNum(cpAcq)}</td><td class="num">${fmtNum(cpTaken)}</td>`;
     html += `<td class="num" style="color:${cpSolde < 0 ? '#dc2626' : '#166534'}">${fmtNum(cpSolde)}</td>`;
     if (canRtt) {
-      const rttAcq = (RTT_ANNUAL[p] || 0) + ((OPENING_BALANCE[p] && OPENING_BALANCE[p].rtt) || 0);
+      const rttAcq = rttAcquired(p, currentYear, currentMonth);
       const rttTaken = countTypeUpTo(p, 'RTT', currentYear, currentMonth);
       const rttSolde = rttAcq - rttTaken;
       html += `<td class="num">${fmtNum(rttAcq)}</td><td class="num">${fmtNum(rttTaken)}</td>`;
@@ -380,7 +385,7 @@ function downloadPDF() {
       { content: fmtNum(cpSolde), styles: { fontStyle: 'bold', textColor: cpSolde < 0 ? [220,38,38] : [22,101,52] } },
     ];
     if (canRtt) {
-      const ra = (RTT_ANNUAL[p] || 0), rt = countTypeUpTo(p, 'RTT', currentYear, currentMonth), rs = ra - rt;
+      const ra = rttAcquired(p, currentYear, currentMonth), rt = countTypeUpTo(p, 'RTT', currentYear, currentMonth), rs = ra - rt;
       row.push(fmtNum(ra), fmtNum(rt), { content: fmtNum(rs), styles: { fontStyle: 'bold', textColor: rs < 0 ? [220,38,38] : [109,40,217] } });
     } else {
       row.push({ content: '-', styles: grey }, { content: '-', styles: grey }, { content: '-', styles: grey });

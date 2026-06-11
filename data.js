@@ -100,8 +100,16 @@ const POINTAGE_LABELS = {
 const CP_PER_MONTH  = 2.5;                 // jours de CP acquis à la fin de chaque mois (tous)
 const RTT_ANNUAL    = { Charles: 13 };     // dotation RTT annuelle (Charles uniquement)
 const ACCRUAL_START = { y: 2026, m: 5 };   // début d'acquisition des CP : juin 2026 (m: 0=janv)
-// Report / solde initial au début de la période (en jours). Vide = 0. Ex : Emilie: { cp: 10 }
-const OPENING_BALANCE = {};
+// Report / solde initial AU 31/05/2026 (soldes à fin mai, hors jours posés après cette date).
+// L'acquisition (CP 2,5/mois, RTT au prorata) démarre ensuite en juin via ACCRUAL_START.
+const OPENING_BALANCE = {
+  Emilie:  { cp: 20.5 },
+  Flora:   { cp: 14 },
+  Chiara:  { cp: 5 },
+  Cédric:  { cp: 17.5 },
+  Dynah:   { cp: 14 },
+  Charles: { cp: 6, rtt: 5.4 }
+};
 // Règles métier : poser des CP/RTT ne réduit PAS l'acquisition. En toute rigueur, le congé sans
 // solde (CS) ne génère pas de CP, et l'arrêt maladie non pro génère 2 j/mois (loi 2024) — ces
 // réductions ne sont PAS appliquées automatiquement dans les compteurs (à ajuster si besoin).
