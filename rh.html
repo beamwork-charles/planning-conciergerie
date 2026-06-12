@@ -189,11 +189,12 @@ const CODE_STYLE = {
   P:   { bg: '#dcfce7', fg: '#166534' },
   CP:  { bg: '#dbeafe', fg: '#1e40af' },
   RTT: { bg: '#ede9fe', fg: '#6d28d9' },
+  PACS:{ bg: '#fce7f3', fg: '#9d174d' },
   AM:  { bg: '#ffedd5', fg: '#9a3412' },
   ABI: { bg: '#fee2e2', fg: '#991b1b' },
   CS:  { bg: '#e2e8f0', fg: '#334155' },
 };
-const CODE_ORDER = ['P','CP','RTT','AM','ABI','CS'];
+const CODE_ORDER = ['P','CP','RTT','PACS','AM','ABI','CS'];
 
 // ----- State -----
 let currentMonth = today.getMonth(), currentYear = today.getFullYear();
@@ -402,14 +403,34 @@ function renderCounters() {
   document.getElementById('counters-table').innerHTML = html;
 }
 
+// Recense ce qui figure réellement sur le mois affiché (codes, heures supp, férié)
+function monthContents() {
+  const codes = new Set();
+  let hasExtra = false, hasHoliday = false;
+  const nbDays = new Date(currentYear, currentMonth + 1, 0).getDate();
+  for (let i = 1; i <= nbDays; i++) {
+    const d = new Date(currentYear, currentMonth, i);
+    const ds = fmt(d);
+    if (isHoliday(d)) hasHoliday = true;
+    for (const p of PEOPLE) {
+      const st = dayCode(p, ds);
+      if (st.code) codes.add(st.code);
+      if (personExtra(p, ds)) hasExtra = true;
+    }
+  }
+  return { codes, hasExtra, hasHoliday };
+}
+// Légende : n'affiche que les pointages présents sur le mois affiché
 function renderLegend() {
+  const { codes, hasExtra, hasHoliday } = monthContents();
   let html = '';
   for (const code of CODE_ORDER) {
+    if (!codes.has(code)) continue;
     const s = CODE_STYLE[code];
     html += `<span class="legend-chip"><span class="legend-box" style="background:${s.bg};color:${s.fg}">${code}</span>${POINTAGE_LABELS[code]}</span>`;
   }
-  html += `<span class="legend-chip"><span class="legend-box" style="background:#fff;color:#b45309;border-color:#fcd34d">+h</span>Heures supp.</span>`;
-  html += `<span class="legend-chip"><span class="legend-box" style="background:repeating-linear-gradient(135deg,#f1f5f9 0 4px,#e9eef4 4px 8px)"></span>Week-end / Férié (F)</span>`;
+  if (hasExtra) html += `<span class="legend-chip"><span class="legend-box" style="background:#fff;color:#b45309;border-color:#fcd34d">+h</span>Heures supp.</span>`;
+  html += `<span class="legend-chip"><span class="legend-box" style="background:repeating-linear-gradient(135deg,#f1f5f9 0 4px,#e9eef4 4px 8px)"></span>${hasHoliday ? 'Week-end / Férié (F)' : 'Week-end'}</span>`;
   document.getElementById('legend').innerHTML = html;
 }
 
@@ -490,7 +511,11 @@ function downloadPDF() {
   });
 
   doc.setFontSize(7); doc.setTextColor(110);
-  doc.text('P=Présent   CP=Congé payé   RTT   AM=Arrêt maladie   ABI=Absence injustifiée   CS=Congé sans solde   +Xh=heures supp   gris=week-end/férié (F)', 8, doc.lastAutoTable.finalY + 5);
+  const mc = monthContents();
+  const legendBits = CODE_ORDER.filter(c => mc.codes.has(c)).map(c => c === 'RTT' ? 'RTT' : `${c}=${POINTAGE_LABELS[c]}`);
+  if (mc.hasExtra) legendBits.push('+Xh=heures supp');
+  legendBits.push(mc.hasHoliday ? 'gris=week-end/férié (F)' : 'gris=week-end');
+  doc.text(legendBits.join('   '), 8, doc.lastAutoTable.finalY + 5);
 
   doc.save(`pointage-${currentYear}-${pad(currentMonth + 1)}.pdf`);
 }

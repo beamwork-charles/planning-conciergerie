@@ -65,12 +65,13 @@ const MIN_Y = 2026, MIN_M = 5;                 // juin 2026 = premier mois visib
 
 // ===== Absences (pointage) =====
 // Type par jour : 'CP' | 'RTT' | 'AM' (arrêt maladie) | 'ABI' (absence injustifiée) | 'CS' (congé sans solde)
+//               | 'PACS' (congé pour événement familial — PACS, non décompté des CP/RTT)
 // RTT réservé à Charles. Toute absence = la personne ne travaille pas ce jour.
 const ABSENCES = {
   Emilie:  { '2026-06-12': 'CP', '2026-07-13': 'CP' },
   Flora:   { '2026-08-10': 'CP', '2026-08-11': 'CP', '2026-08-12': 'CP', '2026-08-13': 'CP', '2026-08-14': 'CP' },
   Chiara:  { '2026-09-07': 'CP', '2026-09-08': 'CP', '2026-09-09': 'CP', '2026-09-10': 'CP', '2026-09-11': 'CP' },
-  Cédric:  {},
+  Cédric:  { '2026-06-01': 'PACS', '2026-06-02': 'PACS', '2026-06-03': 'PACS', '2026-06-04': 'PACS' },
   Dynah:   {
     '2026-07-13': 'CP',
     '2026-07-27': 'CP', '2026-07-28': 'CP', '2026-07-29': 'CP', '2026-07-30': 'CP', '2026-07-31': 'CP',
@@ -96,7 +97,8 @@ const POINTAGE_LABELS = {
   RTT: 'RTT',
   AM:  'Arrêt maladie',
   ABI: 'Absence injustifiée',
-  CS:  'Congé sans solde'
+  CS:  'Congé sans solde',
+  PACS:'Congé PACS'
 };
 
 // ===== Cumuls CP / RTT =====
