@@ -168,7 +168,7 @@
 
     <div class="mt-5 flex flex-wrap gap-6 items-start">
       <div>
-        <div class="text-xs font-extrabold uppercase tracking-wider text-slate-500 mb-2">Compteurs</div>
+        <div class="text-xs font-extrabold uppercase tracking-wider text-slate-500 mb-2">Compteurs <span id="counters-date" class="normal-case font-semibold text-slate-400 tracking-normal"></span></div>
         <table class="counters" id="counters-table"></table>
         <div class="text-[10px] text-slate-400 mt-1">CP : 2,5 j/mois, période 1er juin → 31 mai, remis à zéro au 31 mai (non pris = perdus) ; report au 31/05/2026 intégré. RTT (Charles, forfait 214 j) : jours de repos calculés par année civile, prorata mensuel (13 j en 2026), remis à zéro au 31 décembre. Solde = acquis − pris à fin du mois affiché. H. supp = total du mois.</div>
       </div>
@@ -383,6 +383,8 @@ function rttTakenInYear(person, y, m) {
 }
 
 function renderCounters() {
+  const lastDay = new Date(currentYear, currentMonth + 1, 0).getDate();
+  document.getElementById('counters-date').textContent = `au ${lastDay} ${MONTHS_FR[currentMonth].toLowerCase()} ${currentYear}`;
   let html = '<thead><tr><th class="name" style="text-align:left">Collaborateur</th>'
     + '<th>CP acquis</th><th>CP pris</th><th>CP solde</th>'
     + '<th>RTT acquis</th><th>RTT pris</th><th>RTT solde</th>'
@@ -486,8 +488,13 @@ function downloadPDF() {
     row.push(ot ? `+${ot}h` : '-');
     return row;
   });
+  const cY = doc.lastAutoTable.finalY + 6;
+  const cLastDay = new Date(currentYear, currentMonth + 1, 0).getDate();
+  doc.setFont(undefined, 'bold'); doc.setFontSize(8.5); doc.setTextColor(71, 85, 105);
+  doc.text(`Compteurs — au ${cLastDay} ${MONTHS_FR[currentMonth].toLowerCase()} ${currentYear}`, 8, cY);
+  doc.setFont(undefined, 'normal');
   doc.autoTable({
-    head: cHead, body: cBody, startY: doc.lastAutoTable.finalY + 6, theme: 'grid',
+    head: cHead, body: cBody, startY: cY + 2.5, theme: 'grid',
     styles: { fontSize: 8, cellPadding: 1.4, halign: 'center', lineColor: [226,232,240], lineWidth: 0.1 },
     headStyles: { fillColor: [248,250,252], textColor: [71,85,105], fontStyle: 'bold' },
     columnStyles: { 0: { halign: 'left', fontStyle: 'bold' } },
