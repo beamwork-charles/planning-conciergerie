@@ -213,18 +213,6 @@ function dayCode(person, dateStr) {
 }
 
 // ----- Comptage -----
-function countType(person, type, month) { // month=null => année entière
-  const a = ABSENCES[person] || {};
-  let n = 0;
-  for (const ds in a) {
-    if (a[ds] !== type) continue;
-    const d = parseD(ds);
-    if (d.getFullYear() !== 2026) continue;
-    if (month != null && d.getMonth() !== month) continue;
-    n++;
-  }
-  return n;
-}
 function sumExtra(person, month) {
   let h = 0;
   for (const ds in EXTRA_HOURS) {
