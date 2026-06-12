@@ -510,14 +510,52 @@ function downloadPDF() {
     margin: { left: 8, right: 8 }, tableWidth: 'wrap',
   });
 
-  doc.setFontSize(7); doc.setTextColor(110);
-  const mc = monthContents();
-  const legendBits = CODE_ORDER.filter(c => mc.codes.has(c)).map(c => c === 'RTT' ? 'RTT' : `${c}=${POINTAGE_LABELS[c]}`);
-  if (mc.hasExtra) legendBits.push('+Xh=heures supp');
-  legendBits.push(mc.hasHoliday ? 'gris=week-end/férié (F)' : 'gris=week-end');
-  doc.text(legendBits.join('   '), 8, doc.lastAutoTable.finalY + 5);
+  drawPdfLegend(doc, 8, doc.lastAutoTable.finalY + 7, 289);
 
   doc.save(`pointage-${currentYear}-${pad(currentMonth + 1)}.pdf`);
+}
+
+// Légende PDF en pastilles colorées (carré code + libellé), retour à la ligne auto.
+function drawPdfLegend(doc, x0, y0, maxRight) {
+  const mc = monthContents();
+  const items = [];
+  for (const code of CODE_ORDER) if (mc.codes.has(code)) {
+    const s = CODE_STYLE[code];
+    items.push({ box: code, label: POINTAGE_LABELS[code], bg: hexRgb(s.bg), fg: hexRgb(s.fg) });
+  }
+  if (mc.hasExtra) items.push({ box: '+h', label: 'Heures supp.', bg: [255,255,255], fg: [180,83,9], border: [252,211,77] });
+  items.push({ box: '', label: mc.hasHoliday ? 'Week-end / Férié (F)' : 'Week-end', bg: [233,238,244], fg: [100,116,139], border: [226,232,240], minBoxW: 6 });
+
+  const boxH = 4.2, padX = 1.4, gap = 1.6, chipGap = 5, lineH = 6;
+  let x = x0, y = y0;
+  doc.setLineWidth(0.2);
+
+  // petit intitulé "Légende"
+  doc.setFont(undefined, 'bold'); doc.setFontSize(7); doc.setTextColor(148,163,184);
+  doc.text('LÉGENDE', x0, y - 2.2);
+
+  for (const it of items) {
+    doc.setFont(undefined, 'bold'); doc.setFontSize(6.6);
+    const boxW = Math.max(it.minBoxW || 0, it.box ? doc.getTextWidth(it.box) + padX * 2 : 6);
+    doc.setFont(undefined, 'normal'); doc.setFontSize(7.2);
+    const labelW = doc.getTextWidth(it.label);
+    const chipW = boxW + gap + labelW;
+    if (x + chipW > maxRight) { x = x0; y += lineH; }   // retour à la ligne
+    // carré
+    doc.setFillColor(it.bg[0], it.bg[1], it.bg[2]);
+    if (it.border) { doc.setDrawColor(it.border[0], it.border[1], it.border[2]); doc.roundedRect(x, y, boxW, boxH, 0.9, 0.9, 'FD'); }
+    else doc.roundedRect(x, y, boxW, boxH, 0.9, 0.9, 'F');
+    if (it.box) {
+      doc.setFont(undefined, 'bold'); doc.setFontSize(6.6); doc.setTextColor(it.fg[0], it.fg[1], it.fg[2]);
+      doc.text(it.box, x + boxW / 2, y + boxH / 2 + 0.1, { align: 'center', baseline: 'middle' });
+    }
+    // libellé
+    doc.setFont(undefined, 'normal'); doc.setFontSize(7.2); doc.setTextColor(71, 85, 105);
+    doc.text(it.label, x + boxW + gap, y + boxH / 2 + 0.1, { baseline: 'middle' });
+    x += chipW + chipGap;
+  }
+  doc.setLineWidth(0.1);
+  return y + boxH;
 }
 
 // ----- Navigation -----
