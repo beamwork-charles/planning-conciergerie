@@ -813,32 +813,43 @@ function joinNames(arr) {
   if (names.length <= 1) return names.join('');
   return names.slice(0, -1).join(', ') + ' & ' + names[names.length - 1];
 }
-function tightReason(c) {
+function tightReason(c, requester) {
+  const reqIsRenf = COLLABORATORS[requester]?.role === 'renfort';
   if (c.absentConcierges.length) {
+    if (reqIsRenf) {
+      const otherRenf = requester === 'Dynah' ? 'Charles' : 'Dynah';
+      return `${joinNames(c.absentConcierges)} déjà absent·e — ${otherRenf} restera seul·e pour assurer le remplacement, aucune réserve en cas d'imprévu`;
+    }
     return `${joinNames(c.absentConcierges)} déjà absent·e — les 2 renforts (Dynah & Charles) seront mobilisés`;
   }
   if (c.absentRenforts.length) {
     const otherRenf = c.absentRenforts.includes('Dynah') ? 'Charles' : 'Dynah';
-    return `${joinNames(c.absentRenforts)} (renfort) déjà absent·e — ${otherRenf} sera mobilisé pour vous remplacer`;
+    return `${joinNames(c.absentRenforts)} (renfort) déjà absent·e — ${otherRenf} sera mobilisé·e pour vous remplacer`;
   }
   return 'couverture pile équilibrée';
 }
-function blockerReason(b) {
+function blockerReason(b, requester) {
   const renf = b.absentRenforts, conc = b.absentConcierges;
   if (renf.length === 2) {
     return `Dynah & Charles (les 2 renforts) déjà absents — plus aucun renfort disponible`;
   }
   if (renf.length === 1 && conc.length >= 1) {
     const otherRenf = renf[0] === 'Dynah' ? 'Charles' : 'Dynah';
-    return `${SN(renf[0])} (renfort) et ${joinNames(conc)} déjà absent·e·s — ${otherRenf} est déjà mobilisé pour le remplacement`;
+    if (requester === otherRenf) {
+      return `${SN(renf[0])} (renfort) et ${joinNames(conc)} déjà absent·e·s — vous êtes le dernier renfort disponible pour assurer le remplacement`;
+    }
+    return `${SN(renf[0])} (renfort) et ${joinNames(conc)} déjà absent·e·s — ${otherRenf} est déjà mobilisé·e pour le remplacement`;
   }
   const all = [...renf, ...conc];
   return `${joinNames(all)} déjà absent·e·s — plus assez de renforts pour vous remplacer`;
 }
-// Vrai si au moins une date demandée est à moins de 7 jours d'aujourd'hui
+// Vrai si au moins un JOUR OUVRÉ demandé est à moins de 7 jours d'aujourd'hui
+// (demander un week-end/férié ne déclenche pas l'alerte : rien n'est décompté ces jours-là)
 function hasShortNotice(dates) {
   for (const d of dates) {
-    if (daysBetween(today, parseD(d)) < 7) return true;
+    const dt = parseD(d);
+    if (!isWorkday(dt)) continue;
+    if (daysBetween(today, dt) < 7) return true;
   }
   return false;
 }
@@ -864,13 +875,13 @@ function updateLeavePreview() {
     if (blockers.length) {
       html += `<div class="text-sm text-red-800 font-semibold mb-1">⛔ Congé impossible sur ces jours :</div>`;
       html += `<ul class="text-xs space-y-1 text-red-800 mb-2">`;
-      html += blockers.map(b => `<li><span class="font-semibold">${fmtFR(b.date)}</span> — ${blockerReason(b)}</li>`).join('');
+      html += blockers.map(b => `<li><span class="font-semibold">${fmtFR(b.date)}</span> — ${blockerReason(b, requester)}</li>`).join('');
       html += `</ul>`;
     }
     if (tight.length) {
       html += `<div class="text-sm text-amber-800 font-semibold ${blockers.length ? 'mt-2 ' : ''}mb-1">⚠️ Couverture tendue — demande très probablement refusée :</div>`;
       html += `<ul class="text-xs space-y-1 text-amber-800">`;
-      html += tight.map(t => `<li><span class="font-semibold">${fmtFR(t.date)}</span> — ${tightReason(t)}</li>`).join('');
+      html += tight.map(t => `<li><span class="font-semibold">${fmtFR(t.date)}</span> — ${tightReason(t, requester)}</li>`).join('');
       html += `</ul>`;
     }
     if (shortNotice) {
@@ -896,11 +907,11 @@ function getLeaveEmail() {
   const tight    = leaveTight(requester, dates);
   if (blockers.length) {
     body += `\n⛔ Congé a priori impossible sur ces jours :\n`;
-    body += blockers.map(b => `- ${fmtFR(b.date)} : ${blockerReason(b)}`).join('\n') + '\n';
+    body += blockers.map(b => `- ${fmtFR(b.date)} : ${blockerReason(b, requester)}`).join('\n') + '\n';
   }
   if (tight.length) {
     body += `\n⚠️ Couverture tendue — demande très probablement refusée :\n`;
-    body += tight.map(t => `- ${fmtFR(t.date)} : ${tightReason(t)}`).join('\n') + '\n';
+    body += tight.map(t => `- ${fmtFR(t.date)} : ${tightReason(t, requester)}`).join('\n') + '\n';
   }
   if (hasShortNotice(dates)) {
     body += `\n⏰ Demande à moins de 7 jours — cela peut compliquer l'organisation du planning.\n`;
