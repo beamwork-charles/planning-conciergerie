@@ -359,13 +359,16 @@ function rttAcquired(person, y, m) {
   return rttAnnualForYear(person, y) * (m + 1) / 12;
 }
 
-// Jours d'un type posés sur l'intervalle de mois [startIdx, endIdx] inclus
+// Jours ouvrés d'un type posés sur l'intervalle de mois [startIdx, endIdx] inclus.
+// On ignore les week-ends/fériés : un congé ne se consomme pas un jour non travaillé.
 function countTypeBetween(person, type, startIdx, endIdx) {
   const a = ABSENCES[person] || {};
   let n = 0;
   for (const ds in a) {
     if (a[ds] !== type) continue;
-    const d = parseD(ds), idx = mIdx(d.getFullYear(), d.getMonth());
+    const d = parseD(ds);
+    if (!isWorkday(d)) continue;
+    const idx = mIdx(d.getFullYear(), d.getMonth());
     if (idx >= startIdx && idx <= endIdx) n++;
   }
   return n;
