@@ -452,7 +452,7 @@
     <div class="summer-body">
       <p>Bonjour&nbsp;! 👋 Les beaux jours arrivent — c'est l'heure de réfléchir à vos vacances d'été.</p>
       <p>Pensez à poser vos <strong>2 semaines de congés consécutives</strong> — soit <strong>10 jours ouvrés minimum</strong> — entre le <strong>13&nbsp;juillet</strong> et le <strong>31&nbsp;août</strong>.</p>
-      <div class="summer-tip">💡 Petit conseil&nbsp;: évitez de partir en même temps que votre binôme, pour garder la conciergerie ouverte tout l'été 😉</div>
+      <div class="summer-tip">💡 Petit conseil&nbsp;: évitez de partir en même temps que votre binôme 😉</div>
     </div>
     <div class="summer-actions">
       <button id="summer-leave-btn" class="summer-cta">🌴 Faire ma demande</button>
@@ -1081,10 +1081,19 @@ fabTop.addEventListener('click', () => window.scrollTo({ top: 0, behavior: 'smoo
 (function summerPopup() {
   const DEADLINE = new Date(2026, 5, 28);            // 28 juin 2026 (m: 0=janv)
   if (today.getTime() > DEADLINE.getTime()) return;  // après cette date → ne plus afficher
-  document.getElementById('summer-modal').classList.remove('hidden');
-  document.getElementById('summer-leave-btn').addEventListener('click', () => {
-    closeModal('summer-modal'); openLeaveModal();
+  const show = () => {
+    document.getElementById('summer-modal').classList.remove('hidden');  // l'anim d'entrée se relance (display none→flex)
+    document.getElementById('summer-leave-btn').addEventListener('click', () => {
+      closeModal('summer-modal'); openLeaveModal();
+    }, { once: true });
+  };
+  // Si l'écran de mot de passe est déjà parti (session authentifiée), on affiche tout de suite.
+  // Sinon on attend sa disparition pour ne pas afficher le popup derrière, ni provoquer de flash.
+  if (!document.getElementById('lock-screen')) { show(); return; }
+  const obs = new MutationObserver(() => {
+    if (!document.getElementById('lock-screen')) { obs.disconnect(); show(); }
   });
+  obs.observe(document.body, { childList: true });
 })();
 
 // ----- Init -----
