@@ -335,6 +335,36 @@
   }
   .lock-btn:hover { transform: translateY(-1px); box-shadow: 0 8px 24px rgba(59,130,246,.4); }
   .lock-error { color: #ef4444; font-size: 13px; font-weight: 600; margin-top: 8px; min-height: 18px; }
+
+  /* Popup vacances d'été */
+  .summer-card { max-width: 460px; overflow: hidden; }
+  .summer-head {
+    position: relative; padding: 28px 24px 22px; color: #fff; text-align: center;
+    background: linear-gradient(135deg, #f59e0b 0%, #fb923c 48%, #f43f5e 120%);
+  }
+  .summer-emoji { font-size: 40px; line-height: 1; margin-bottom: 8px; }
+  .summer-head h2 { font-size: 21px; font-weight: 800; line-height: 1.22; }
+  .summer-close {
+    position: absolute; top: 12px; right: 14px; color: rgba(255,255,255,.85);
+    font-size: 28px; line-height: 1; background: none; border: 0; cursor: pointer;
+  }
+  .summer-close:hover { color: #fff; }
+  .summer-body { padding: 20px 24px 6px; color: #334155; font-size: 14.5px; line-height: 1.5; }
+  .summer-body p { margin-bottom: 12px; }
+  .summer-body strong { color: #b45309; }
+  .summer-tip {
+    background: #fffbeb; border: 1px solid #fde68a; border-radius: 12px;
+    padding: 10px 12px; color: #92400e; font-weight: 600; font-size: 13.5px;
+  }
+  .summer-actions { padding: 6px 24px 24px; display: flex; flex-direction: column; gap: 10px; }
+  .summer-cta {
+    width: 100%; padding: 12px; border: 0; border-radius: 12px; cursor: pointer;
+    background: linear-gradient(135deg, #f59e0b, #fb923c); color: #fff; font-weight: 800; font-size: 15px;
+    box-shadow: 0 8px 20px rgba(245,158,11,.35); transition: transform .15s, box-shadow .15s;
+  }
+  .summer-cta:hover { transform: translateY(-1px); box-shadow: 0 10px 26px rgba(245,158,11,.45); }
+  .summer-later { background: none; border: 0; color: #94a3b8; font-weight: 600; font-size: 13px; cursor: pointer; }
+  .summer-later:hover { color: #64748b; }
 </style>
 </head>
 <body class="text-slate-900">
@@ -408,6 +438,26 @@
 <div id="leave-modal" class="modal-backdrop hidden">
   <div class="modal-card">
     <div id="leave-modal-content"></div>
+  </div>
+</div>
+
+<!-- Popup vacances d'été (affiché à chaque chargement jusqu'au 28/06/2026 inclus) -->
+<div id="summer-modal" class="modal-backdrop hidden">
+  <div class="modal-card summer-card">
+    <div class="summer-head">
+      <button onclick="closeModal('summer-modal')" class="summer-close" aria-label="Fermer">×</button>
+      <div class="summer-emoji">☀️🌴</div>
+      <h2>C'est le moment de penser à l'été&nbsp;!</h2>
+    </div>
+    <div class="summer-body">
+      <p>Bonjour&nbsp;! 👋 Les beaux jours arrivent — c'est l'heure de réfléchir à vos vacances d'été.</p>
+      <p>Pensez à poser vos <strong>2 semaines de congés consécutives</strong> entre le <strong>13&nbsp;juillet</strong> et le <strong>31&nbsp;août</strong>.</p>
+      <div class="summer-tip">💡 Petit conseil&nbsp;: évitez de partir en même temps que votre binôme, pour garder la conciergerie ouverte tout l'été 😉</div>
+    </div>
+    <div class="summer-actions">
+      <button id="summer-leave-btn" class="summer-cta">🌴 Faire ma demande</button>
+      <button onclick="closeModal('summer-modal')" class="summer-later">Plus tard</button>
+    </div>
   </div>
 </div>
 
@@ -953,10 +1003,15 @@ async function copyLeaveContent(btn) {
 }
 
 function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
+function anyModalOpen() {
+  return !document.getElementById('leave-modal').classList.contains('hidden')
+      || !document.getElementById('summer-modal').classList.contains('hidden');
+}
 document.getElementById('leave-modal').addEventListener('click', (e) => { if (e.target.id === 'leave-modal') closeModal('leave-modal'); });
+document.getElementById('summer-modal').addEventListener('click', (e) => { if (e.target.id === 'summer-modal') closeModal('summer-modal'); });
 document.addEventListener('keydown', (e) => {
-  const modalOpen = !document.getElementById('leave-modal').classList.contains('hidden');
-  if (e.key === 'Escape') closeModal('leave-modal');
+  const modalOpen = anyModalOpen();
+  if (e.key === 'Escape') { closeModal('leave-modal'); closeModal('summer-modal'); }
   if (!modalOpen) { if (e.key === 'ArrowLeft') prevMonth(); if (e.key === 'ArrowRight') nextMonth(); }
 });
 
@@ -1021,6 +1076,16 @@ calEl.addEventListener('touchend', (e) => {
 const fabTop = document.getElementById('fab-top');
 window.addEventListener('scroll', () => fabTop.classList.toggle('show', window.scrollY > 500), { passive: true });
 fabTop.addEventListener('click', () => window.scrollTo({ top: 0, behavior: 'smooth' }));
+
+// ----- Popup vacances d'été : à chaque chargement jusqu'au 28/06/2026 inclus, puis plus rien -----
+(function summerPopup() {
+  const DEADLINE = new Date(2026, 5, 28);            // 28 juin 2026 (m: 0=janv)
+  if (today.getTime() > DEADLINE.getTime()) return;  // après cette date → ne plus afficher
+  document.getElementById('summer-modal').classList.remove('hidden');
+  document.getElementById('summer-leave-btn').addEventListener('click', () => {
+    closeModal('summer-modal'); openLeaveModal();
+  });
+})();
 
 // ----- Init -----
 render();
