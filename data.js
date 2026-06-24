@@ -58,7 +58,7 @@ const COLOR_HEX = {
 const REF_MONDAY    = new Date(2026, 5, 8);
 // Périodes en horaires réduits (9h-17h)
 const REDUCED_PERIODS = [
-  { start: new Date(2026, 6, 13), end: new Date(2026, 7, 28) },   // été : 13/07 → 28/08/2026
+  { start: new Date(2026, 7, 1),  end: new Date(2026, 7, 21) },   // été : 3 premières semaines d'août (01 → 21/08/2026)
   { start: new Date(2026, 11, 21), end: new Date(2027, 0, 1) }    // fêtes : 21/12/2026 → 01/01/2027
 ];
 const MIN_Y = 2026, MIN_M = 5;                 // juin 2026 = premier mois visible
