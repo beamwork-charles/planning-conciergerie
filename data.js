@@ -235,7 +235,7 @@ function isReducedDay(d) {
 // Horaires réduits ponctuels pour UN bâtiment précis (en plus des périodes globales).
 // Format : { 'AAAA-MM-JJ': ['TB3'|'TB4', ...] }
 const REDUCED_BUILDING_DAYS = {
-  '2026-06-23': ['TB4'],
+  '2026-06-26': ['TB4'],   // canicule (40°) et pas de clim à TB4 (TB3 climatisé) → horaires réduits TB4
 };
 // Le bâtiment donné est-il en horaires réduits ce jour-là ? (période globale OU override bâtiment)
 function isReducedFor(d, building) {
