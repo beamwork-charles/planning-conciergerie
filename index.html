@@ -90,6 +90,10 @@
   .bld-card.tb3 .bld-label::before { background: #6366f1; }
   .bld-card.tb4 .bld-label { color: #0d9488; }
   .bld-card.tb4 .bld-label::before { background: #14b8a6; }
+  .bld-reduced {
+    margin-left: auto; font-size: 9px; font-weight: 800; letter-spacing: .3px;
+    color: #fff; background: #f59e0b; padding: 1px 6px; border-radius: 999px; text-transform: none;
+  }
   .shift-bar {
     display: flex; align-items: center; gap: 8px;
     padding: 6px 10px; border-radius: 8px;
@@ -491,26 +495,23 @@ function genDay(date) {
   if (isWeekend || holiday) return { date: dateStr, isWeekend, holiday, off: true };
 
   const parity = getWeekParity(date);
-  const reduced = isReducedDay(date);
   const morningTB3 = parity === 0 ? 'Flora' : 'Emilie';
   const eveningTB3 = parity === 0 ? 'Emilie' : 'Flora';
   const morningTB4 = parity === 0 ? 'Cédric' : 'Chiara';
   const eveningTB4 = parity === 0 ? 'Chiara' : 'Cédric';
 
-  let schedule;
-  if (reduced) {
-    schedule = {
-      date: dateStr, reduced: true, holiday: null, isWeekend: false,
-      TB3: { slots: BUILDING_CONCIERGES.TB3.map(p => mkShift('9h-17h', p)) },
-      TB4: { slots: BUILDING_CONCIERGES.TB4.map(p => mkShift('9h-17h', p)) }
-    };
-  } else {
-    schedule = {
-      date: dateStr, reduced: false, holiday: null, isWeekend: false,
-      TB3: { morning: mkShift('8h-16h', morningTB3), evening: mkShift('11h-19h', eveningTB3) },
-      TB4: { morning: mkShift('8h-16h', morningTB4), evening: mkShift('11h-19h', eveningTB4) }
-    };
-  }
+  // Réduit calculé PAR bâtiment (périodes globales communes + override ponctuel d'un seul bâtiment)
+  const redTB3 = isReducedFor(date, 'TB3'), redTB4 = isReducedFor(date, 'TB4');
+  const block = (building, red, m, e) => red
+    ? { slots: BUILDING_CONCIERGES[building].map(p => mkShift('9h-17h', p)) }
+    : { morning: mkShift('8h-16h', m), evening: mkShift('11h-19h', e) };
+  const schedule = {
+    date: dateStr, holiday: null, isWeekend: false,
+    reduced: redTB3 && redTB4,            // jour entièrement réduit (les 2 bâtiments)
+    reducedTB3: redTB3, reducedTB4: redTB4,
+    TB3: block('TB3', redTB3, morningTB3, eveningTB3),
+    TB4: block('TB4', redTB4, morningTB4, eveningTB4)
+  };
 
   const absentToday = new Set();
   for (const p of Object.keys(COLLABORATORS)) if (isAbsent(p, dateStr)) absentToday.add(p);
@@ -553,24 +554,21 @@ function applySubs(schedule, absentToday) {
     }
     return null;
   };
-  if (schedule.reduced) {
-    for (const b of ['TB3','TB4']) {
-      const blk = schedule[b];
+  // Traitement PAR bâtiment : réduit (blk.slots) ou normal (blk.morning/evening)
+  for (const b of ['TB3','TB4']) {
+    const blk = schedule[b];
+    if (blk.slots) {
+      // Réduit : les 2 concierges du bâtiment ensemble. Si tous absents → 1 renfort ; sinon le(s) présent(s) assurent.
       const present = blk.slots.filter(s => !absentToday.has(s.person));
       if (present.length === 0) {
-        // Les 2 concierges absents → un renfort assure le 9h-17h
         const slot = mkShift('9h-17h', pickRenfort());
         slot.substituteFor = blk.slots[0].person;
         blk.slots = [slot];
       } else {
-        // Un (ou deux) concierge(s) présent(s) assurent — pas de renfort
         blk.slots = present;
       }
-    }
-  } else {
-    // Règle simple : le renfort prend directement le shift de l'absent, l'autre concierge ne bouge pas
-    for (const b of ['TB3','TB4']) {
-      const blk = schedule[b];
+    } else {
+      // Normal : le renfort prend directement le shift de l'absent, l'autre concierge ne bouge pas
       for (const slot of ['morning', 'evening']) {
         const s = blk[slot];
         if (absentToday.has(s.person)) {
@@ -617,7 +615,7 @@ function renderHeader() { document.getElementById('period-label').textContent = 
 function renderStatusLine() {
   const first = new Date(currentYear, currentMonth, 1), last = new Date(currentYear, currentMonth + 1, 0);
   let reducedInMonth = false;
-  for (let d = new Date(first); d <= last; d.setDate(d.getDate()+1)) if (isReducedDay(d)) { reducedInMonth = true; break; }
+  for (let d = new Date(first); d <= last; d.setDate(d.getDate()+1)) if (isReducedFor(d,'TB3') || isReducedFor(d,'TB4')) { reducedInMonth = true; break; }
   document.getElementById('status-line').innerHTML = reducedInMonth
     ? `<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-amber-50 text-amber-800 border border-amber-200 font-semibold">🕘 Horaires réduits ce mois</span>` : '';
 }
@@ -663,8 +661,8 @@ function renderDayCell(date, isCurrent, isToday) {
   if (sch.holiday)   return html + `<div class="text-[11px] text-red-600 font-semibold mt-1">${sch.holiday}</div></div>`;
 
   html += `<div class="day-buildings">`;
-  html += renderBuildingMini('TB3', sch.TB3, sch.date);
-  html += renderBuildingMini('TB4', sch.TB4, sch.date);
+  html += renderBuildingMini('TB3', sch.TB3, sch.date, sch.reducedTB3 && !sch.reduced);
+  html += renderBuildingMini('TB4', sch.TB4, sch.date, sch.reducedTB4 && !sch.reduced);
   html += `</div>`;
   html += renderManagers(sch.date);
   html += `</div>`;
@@ -681,8 +679,9 @@ function renderManagers(dateStr) {
   return `<div class="mng-row" aria-label="Managers">${chips}</div>`;
 }
 
-function renderBuildingMini(name, blk, dateStr) {
-  let html = `<div class="bld-card ${name.toLowerCase()}"><div class="bld-label">${name}</div>`;
+function renderBuildingMini(name, blk, dateStr, reducedBadge) {
+  const badge = reducedBadge ? `<span class="bld-reduced">9h-17h</span>` : '';
+  let html = `<div class="bld-card ${name.toLowerCase()}"><div class="bld-label">${name}${badge}</div>`;
   if (blk.slots) html += blk.slots.map(s => renderShiftBar(s, '9h-17h')).join('');
   else { html += renderShiftBar(blk.morning, blk.morning.time); html += renderShiftBar(blk.evening, blk.evening.time); }
   html += renderOffRows(name, dateStr);

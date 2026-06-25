@@ -227,10 +227,21 @@ function isBridgeDay(d) {
   if (dow === 1) { const n = new Date(d); n.setDate(n.getDate()+1); if (isHoliday(n)) return true; }
   return false;
 }
-// Horaires réduits : période 13/07–28/08 OU jour de pont
+// Horaires réduits (les 2 bâtiments) : période globale OU jour de pont
 function isReducedDay(d) {
   for (const p of REDUCED_PERIODS) if (d >= p.start && d <= p.end) return true;
   return isBridgeDay(d);
+}
+// Horaires réduits ponctuels pour UN bâtiment précis (en plus des périodes globales).
+// Format : { 'AAAA-MM-JJ': ['TB3'|'TB4', ...] }
+const REDUCED_BUILDING_DAYS = {
+  '2026-06-23': ['TB4'],
+};
+// Le bâtiment donné est-il en horaires réduits ce jour-là ? (période globale OU override bâtiment)
+function isReducedFor(d, building) {
+  if (isReducedDay(d)) return true;
+  const list = REDUCED_BUILDING_DAYS[fmt(d)];
+  return !!(list && list.includes(building));
 }
 function getWeekParity(d) {
   const monday = new Date(d);
