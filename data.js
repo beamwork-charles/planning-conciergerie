@@ -136,6 +136,13 @@ const OVERRIDES = {
       morning: { person: 'Dynah', substituteFor: 'Flora' },
       evening: { person: 'Flora', substituteFor: 'Emilie' }
     }
+  },
+  // 01/07 : Flora et Émilie inversent exceptionnellement leurs shifts (par défaut Émilie matin / Flora soir)
+  '2026-07-01': {
+    TB3: {
+      morning: { person: 'Flora' },
+      evening: { person: 'Emilie' }
+    }
   }
 };
 
