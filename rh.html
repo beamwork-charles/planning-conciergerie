@@ -170,7 +170,7 @@
       <div>
         <div class="text-xs font-extrabold uppercase tracking-wider text-slate-500 mb-2">Compteurs <span id="counters-date" class="normal-case font-semibold text-slate-400 tracking-normal"></span></div>
         <table class="counters" id="counters-table"></table>
-        <div class="text-[10px] text-slate-400 mt-1">CP : 2,5 j/mois, période 1er juin → 31 mai, remis à zéro au 31 mai (non pris = perdus) ; report au 31/05/2026 intégré. RTT (Charles, forfait 214 j) : jours de repos calculés par année civile, prorata mensuel (13 j en 2026), remis à zéro au 31 décembre. Solde = acquis − pris à fin du mois affiché. H. supp = total du mois.</div>
+        <div class="text-[10px] text-slate-400 mt-1">CP : 2,5 j/mois, période 1er juin → 31 mai, remis à zéro au 31 mai (non pris = perdus) ; report au 31/05/2026 intégré. RTT (Charles, forfait 214 j) : dotation annuelle de jours de repos (13 j en 2026), disponible sur toute l'année civile, remise à zéro au 31 décembre. Solde = acquis − pris à fin du mois affiché. H. supp = total du mois.</div>
       </div>
     </div>
   </div>
@@ -343,9 +343,10 @@ function cpAcquired(person, y, m) {
   return seed + CP_PER_MONTH * months;
 }
 
-// --- RTT : forfait jours, année civile, remise à zéro chaque 1er janvier (non pris = perdus) ---
+// --- RTT : forfait jours = dotation ANNUELLE (13 en 2026), disponible sur toute l'année civile.
+// Pas de prorata mensuel (≠ CP) : le solde = dotation − pris reste donc toujours ≥ 0. Reset au 1er janvier.
 function rttAcquired(person, y, m) {
-  return rttAnnualForYear(person, y) * (m + 1) / 12;
+  return rttAnnualForYear(person, y);
 }
 
 // Jours ouvrés d'un type posés sur l'intervalle de mois [startIdx, endIdx] inclus.
