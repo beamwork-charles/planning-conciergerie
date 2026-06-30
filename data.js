@@ -91,11 +91,13 @@ const ABSENCES = {
   Charles: {
     // H1 : congés payés
     '2026-06-15': 'CP', '2026-06-16': 'CP', '2026-06-17': 'CP', '2026-06-18': 'CP', '2026-06-19': 'CP',
-    // H2 : RTT prioritaires (ils expirent au 31/12 ; les CP courent jusqu'au 31/05). Quota = 13 RTT/an.
-    // Août 24-28 (5) + 21-30/09 (8) = 13 RTT → quota plein, aucun RTT perdu. Les 2 jours en trop (01-02/10) en CP.
+    // H2 : on privilégie les RTT, mais SEULEMENT tant qu'ils sont acquis sur le compteur (cumul mensuel
+    // ~1,08/mois). Au moment du congé Charles a ~9 RTT acquis → 9 RTT posés (24-28/08 + 21-24/09),
+    // le reste de l'été en CP. Ainsi le solde RTT n'est jamais négatif. Les RTT restants (~4) se posent
+    // plus tard dans l'année, une fois acquis, pour ne pas les perdre au 31/12.
     '2026-08-24': 'RTT', '2026-08-25': 'RTT', '2026-08-26': 'RTT', '2026-08-27': 'RTT', '2026-08-28': 'RTT',
-    '2026-09-21': 'RTT', '2026-09-22': 'RTT', '2026-09-23': 'RTT', '2026-09-24': 'RTT', '2026-09-25': 'RTT',
-    '2026-09-28': 'RTT', '2026-09-29': 'RTT', '2026-09-30': 'RTT',
+    '2026-09-21': 'RTT', '2026-09-22': 'RTT', '2026-09-23': 'RTT', '2026-09-24': 'RTT',
+    '2026-09-25': 'CP', '2026-09-28': 'CP', '2026-09-29': 'CP', '2026-09-30': 'CP',
     '2026-10-01': 'CP', '2026-10-02': 'CP'
   }
 };
