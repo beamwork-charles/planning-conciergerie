@@ -700,7 +700,8 @@ function renderOffRows(building, dateStr) {
 function renderShiftBar(shift, label) {
   const meta = shift.person ? COLLABORATORS[shift.person] : null;
   const colorClass = meta ? `clr-${meta.color}` : 'clr-none';
-  const nm = meta ? meta.shortName : '⚠️ Aucun';
+  // Personne hors équipe (ex. remplaçant·e externe placé·e via OVERRIDES) : on affiche son nom, style neutre.
+  const nm = meta ? meta.shortName : (shift.person || '⚠️ Aucun');
   const sub = shift.substituteFor ? `<span class="sub-note">remplace ${SN(shift.substituteFor)}</span>` : '';
   return `<div class="shift-bar ${colorClass} ${shift.substituteFor ? 'is-sub' : ''} ${!shift.person ? 'is-none' : ''}">
       <span class="when">${label}</span><span class="name-wrap"><span class="name">${nm}</span>${sub}</span></div>`;

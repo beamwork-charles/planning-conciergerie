@@ -68,7 +68,12 @@ const MIN_Y = 2026, MIN_M = 5;                 // juin 2026 = premier mois visib
 //               | 'PACS' (congé pour événement familial — PACS, non décompté des CP/RTT)
 // RTT réservé à Charles. Toute absence = la personne ne travaille pas ce jour.
 const ABSENCES = {
-  Emilie:  { '2026-06-12': 'CP', '2026-07-13': 'CP' },
+  Emilie:  {
+    '2026-06-12': 'CP', '2026-07-13': 'CP',
+    // CP 17 → 28/08 (jours ouvrés ; week-end 22-23/08 exclu). 27-28/08 : remplacée (voir OVERRIDES).
+    '2026-08-17': 'CP', '2026-08-18': 'CP', '2026-08-19': 'CP', '2026-08-20': 'CP', '2026-08-21': 'CP',
+    '2026-08-24': 'CP', '2026-08-25': 'CP', '2026-08-26': 'CP', '2026-08-27': 'CP', '2026-08-28': 'CP'
+  },
   Flora:   { '2026-08-10': 'CP', '2026-08-11': 'CP', '2026-08-12': 'CP', '2026-08-13': 'CP', '2026-08-14': 'CP' },
   Chiara:  { '2026-07-24': 'CP', '2026-09-07': 'CP', '2026-09-08': 'CP', '2026-09-09': 'CP', '2026-09-10': 'CP', '2026-09-11': 'CP' },
   Cédric:  {
@@ -155,6 +160,16 @@ const OVERRIDES = {
       morning: { person: 'Flora' },
       evening: { person: 'Emilie' }
     }
+  },
+  // 27-28/08 : Émilie ET Cédric absents (parité 1 → Émilie=TB3 matin, Cédric=TB4 soir).
+  // Dynah prend le shift d'Émilie, Naomi (remplaçante externe, absente du pointage RH) prend celui de Cédric.
+  '2026-08-27': {
+    TB3: { morning: { person: 'Dynah',  substituteFor: 'Emilie' } },
+    TB4: { evening: { person: 'Naomi',  substituteFor: 'Cédric' } }
+  },
+  '2026-08-28': {
+    TB3: { morning: { person: 'Dynah',  substituteFor: 'Emilie' } },
+    TB4: { evening: { person: 'Naomi',  substituteFor: 'Cédric' } }
   }
 };
 
