@@ -143,6 +143,23 @@ const EXTRA_HOURS = {
   '2026-06-24': [ { person: 'Emilie', label: '19h–22h', hours: 3 } ]
 };
 
+// Arrangements durables entre binômes, par jour de la semaine — écrasent l'alternance de parité
+// (mais restent écrasables par un OVERRIDES ponctuel, appliqué plus tard).
+// Format : { TB3|TB4: { since: 'AAAA-MM-JJ', days: { <0=dim..6=sam>: { morning, evening } } } }
+// `since` évite de réécrire l'historique déjà affiché : avant cette date, l'alternance normale s'applique.
+const FIXED_WEEKDAY_SHIFTS = {
+  // TB3 — arrangement Flora / Émilie : Flora a besoin de tous ses jeudis soir, elle prend donc tous les
+  // jeudis matin (fin à 16h) ; en contrepartie Émilie prend tous les vendredis matin.
+  // Neutre sur le cycle de 2 semaines : chacune garde 5 matins et 5 soirs.
+  TB3: {
+    since: '2026-09-01',   // date de l'accord — l'historique d'avant garde l'alternance normale
+    days: {
+      4: { morning: 'Flora',  evening: 'Emilie' },   // jeudi
+      5: { morning: 'Emilie', evening: 'Flora'  }    // vendredi
+    }
+  }
+};
+
 // Exceptions manuelles par date — écrasent l'affectation auto du planning (après remplacements)
 // Format : { 'AAAA-MM-JJ': { TB3|TB4: { morning|evening: { person, substituteFor } } } }
 const OVERRIDES = {
@@ -161,15 +178,42 @@ const OVERRIDES = {
       evening: { person: 'Emilie' }
     }
   },
-  // 27-28/08 : Émilie ET Cédric absents (parité 1 → Émilie=TB3 matin, Cédric=TB4 soir).
-  // Dynah prend le shift d'Émilie, Naomi (remplaçante externe, absente du pointage RH) prend celui de Cédric.
+  // 24 → 28/08 : Émilie en CP toute la semaine (parité 1 → Émilie=TB3 matin, Flora=TB3 soir).
+  // Inversion Flora / Dynah : Flora ouvre le matin (couvre Émilie) et Dynah prend le soir (shift de Flora),
+  // au lieu du remplacement auto qui mettait Dynah le matin. Charles est en RTT → Dynah est le seul renfort.
+  '2026-08-24': {
+    TB3: {
+      morning: { person: 'Flora', substituteFor: 'Emilie' },
+      evening: { person: 'Dynah', substituteFor: 'Flora'  }
+    }
+  },
+  '2026-08-25': {
+    TB3: {
+      morning: { person: 'Flora', substituteFor: 'Emilie' },
+      evening: { person: 'Dynah', substituteFor: 'Flora'  }
+    }
+  },
+  '2026-08-26': {
+    TB3: {
+      morning: { person: 'Flora', substituteFor: 'Emilie' },
+      evening: { person: 'Dynah', substituteFor: 'Flora'  }
+    }
+  },
+  // 27-28/08 : idem, mais Cédric est aussi en CP (parité 1 → Cédric=TB4 soir).
+  // Naomi (remplaçante externe, absente du pointage RH) prend le shift de Cédric.
   '2026-08-27': {
-    TB3: { morning: { person: 'Dynah',  substituteFor: 'Emilie' } },
-    TB4: { evening: { person: 'Naomi',  substituteFor: 'Cédric' } }
+    TB3: {
+      morning: { person: 'Flora', substituteFor: 'Emilie' },
+      evening: { person: 'Dynah', substituteFor: 'Flora'  }
+    },
+    TB4: { evening: { person: 'Naomi', substituteFor: 'Cédric' } }
   },
   '2026-08-28': {
-    TB3: { morning: { person: 'Dynah',  substituteFor: 'Emilie' } },
-    TB4: { evening: { person: 'Naomi',  substituteFor: 'Cédric' } }
+    TB3: {
+      morning: { person: 'Flora', substituteFor: 'Emilie' },
+      evening: { person: 'Dynah', substituteFor: 'Flora'  }
+    },
+    TB4: { evening: { person: 'Naomi', substituteFor: 'Cédric' } }
   }
 };
 

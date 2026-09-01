@@ -494,11 +494,21 @@ function genDay(date) {
   const holiday = isHoliday(date);
   if (isWeekend || holiday) return { date: dateStr, isWeekend, holiday, off: true };
 
+  // Alternance de base (cycle de 2 semaines à partir de REF_MONDAY)
   const parity = getWeekParity(date);
-  const morningTB3 = parity === 0 ? 'Flora' : 'Emilie';
-  const eveningTB3 = parity === 0 ? 'Emilie' : 'Flora';
-  const morningTB4 = parity === 0 ? 'Cédric' : 'Chiara';
-  const eveningTB4 = parity === 0 ? 'Chiara' : 'Cédric';
+  const base = {
+    TB3: parity === 0 ? { morning: 'Flora',  evening: 'Emilie' } : { morning: 'Emilie', evening: 'Flora'  },
+    TB4: parity === 0 ? { morning: 'Cédric', evening: 'Chiara' } : { morning: 'Chiara', evening: 'Cédric' }
+  };
+  // Arrangements durables par jour de semaine (voir FIXED_WEEKDAY_SHIFTS) : écrasent l'alternance
+  for (const b of ['TB3', 'TB4']) {
+    const arr = FIXED_WEEKDAY_SHIFTS[b];
+    if (!arr || dateStr < arr.since) continue;
+    const fixed = arr.days[dow];
+    if (fixed) Object.assign(base[b], fixed);
+  }
+  const morningTB3 = base.TB3.morning, eveningTB3 = base.TB3.evening;
+  const morningTB4 = base.TB4.morning, eveningTB4 = base.TB4.evening;
 
   // Réduit calculé PAR bâtiment (périodes globales communes + override ponctuel d'un seul bâtiment)
   const redTB3 = isReducedFor(date, 'TB3'), redTB4 = isReducedFor(date, 'TB4');
