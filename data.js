@@ -155,6 +155,9 @@ const FIXED_WEEKDAY_SHIFTS = {
   // TB3 — arrangement Flora / Émilie : Flora a besoin de tous ses jeudis soir, elle prend donc tous les
   // jeudis matin (fin à 16h) ; en contrepartie Émilie prend tous les vendredis matin.
   // Neutre sur le cycle de 2 semaines : chacune garde 5 matins et 5 soirs.
+  // Ne s'applique PAS en horaires réduits : ces jours-là les deux concierges du bâtiment
+  // travaillent ensemble 9h-17h, Flora finit donc à 17h comme tout le monde (arbitré le 01/09/2026 —
+  // concerne les jeudis 24/12 et 31/12/2026). Rien à coder : block() ignore morning/evening en réduit.
   TB3: {
     since: '2026-09-01',   // date de l'accord — l'historique d'avant garde l'alternance normale
     days: {
