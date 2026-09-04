@@ -221,6 +221,15 @@ const OVERRIDES = {
       evening: { person: 'Dynah', substituteFor: 'Flora'  }
     },
     TB4: { evening: { person: 'Naomi', substituteFor: 'Cédric' } }
+  },
+  // 09/09 : Chiara ET Dynah en CP (parité 1 → Chiara=TB4 matin, Cédric=TB4 soir), Charles est donc le
+  // seul renfort disponible. Inversion demandée : Charles prend le soir (shift de Cédric) et Cédric
+  // bascule sur le matin (il couvre Chiara).
+  '2026-09-09': {
+    TB4: {
+      morning: { person: 'Cédric',  substituteFor: 'Chiara' },
+      evening: { person: 'Charles', substituteFor: 'Cédric' }
+    }
   }
 };
 
