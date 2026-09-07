@@ -123,11 +123,23 @@ const POINTAGE_LABELS = {
 };
 
 // ===== Cumuls CP / RTT =====
-const CP_PER_MONTH  = 2.5;                 // jours de CP acquis à la fin de chaque mois (tous, Code du travail)
+// CONVENTION : tout est compté en JOURS OUVRÉS (lundi-vendredi, fériés exclus). C'est la base
+// utilisée par le décompte (countTypeBetween ignore les non-jours-ouvrés), par la modale de demande
+// de congé et par CP_LEGAL_DAYS ci-dessous. 25 j ouvrés/an = 5 semaines = l'équivalent des 30 jours
+// OUVRABLES du Code du travail (2,5/mois, samedis compris). Ne PAS mélanger les deux bases : acquérir
+// 30/an tout en ne décomptant que les jours ouvrés créditait ~5 jours fantômes par personne et par an.
+const CP_PER_MONTH  = 25 / 12;             // ≈ 2,083 j ouvrés acquis à la fin de chaque mois (= 25/an)
 const ACCRUAL_START = { y: 2026, m: 5 };   // début du suivi des CP : juin 2026 (m: 0=janv)
 // RTT : pas de dotation fixe. Charles est cadre au forfait jours → les jours de repos sont
 // recalculés chaque année civile par la formule forfait (voir FORFAIT_DAYS + rttAnnualForYear plus bas).
 // Report / solde initial DES CP au 31/05/2026 (soldes à fin mai, hors jours posés après cette date).
+// ⚠️ Ces chiffres viennent du logiciel de pointage et son unité n'a pas pu être vérifiée. Deux indices
+// suggèrent une base OUVRABLES (17,5 = 2,5 × 7 et 5 = 2,5 × 2 tombent pile ; aucun solde ne tombe sur
+// un tiers, signature du 2,5/mois). Si c'est le cas, ce report est surévalué d'environ 1/6 une fois
+// converti en jours ouvrés. Il est laissé TEL QUEL volontairement : sous-évaluer un droit à congés
+// est plus préjudiciable que le surévaluer, et la correction se ferait à la baisse.
+// Pour trancher : un bulletin de paie d'août ou septembre 2026 indique le solde de CP et ce qui a été
+// décompté (ex. Émilie 17-28/08 → 10 j = base ouvrés, 11 ou 12 j = base ouvrables).
 // L'acquisition CP (2,5/mois) démarre ensuite en juin via ACCRUAL_START. Les RTT étant recalculés
 // chaque année par la formule, il n'y a pas de report manuel à saisir pour eux.
 const OPENING_BALANCE = {
