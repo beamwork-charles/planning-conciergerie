@@ -4,3 +4,13 @@ Thumbs.db
 .idea/
 *.log
 .claude/
+
+# Documents RH / personnels — NE JAMAIS commiter : ce depot est PUBLIC (GitHub Pages).
+# Deposer les bulletins de paie HORS du depot ; ces regles ne sont qu'un garde-fou.
+bulletins/
+paie/
+rh-prive/
+*.pdf
+*.csv
+*.xlsx
+*.xls
