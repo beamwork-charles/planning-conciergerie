@@ -170,7 +170,7 @@
       <div>
         <div class="text-xs font-extrabold uppercase tracking-wider text-slate-500 mb-2">Compteurs <span id="counters-date" class="normal-case font-semibold text-slate-400 tracking-normal"></span></div>
         <table class="counters" id="counters-table"></table>
-        <div class="text-[10px] text-slate-400 mt-1">CP : 25 j ouvrés/an (≈ 2,08 j/mois), période 1er juin → 31 mai, remis à zéro au 31 mai (non pris = perdus) ; report au 31/05/2026 intégré. RTT (Charles, forfait 214 j) : jours de repos calculés par année civile (13 j en 2026), cumulés au prorata mensuel, remis à zéro au 31 décembre. Solde = acquis − pris à fin du mois affiché. H. supp = total du mois. Tout est en jours ouvrés (lun-ven) ; le report au 31/05/2026 vient du logiciel de pointage, dans une unité non vérifiée — <strong>estimation, le bulletin de paie fait foi</strong>.</div>
+        <div class="text-[10px] text-slate-400 mt-1">CP : 25 j ouvrés/an (≈ 2,08 j/mois), période 1er juin → 31 mai, remis à zéro au 31 mai (non pris = perdus) ; report au 31/05/2026 intégré. RTT (Charles, forfait 214 j) : jours de repos calculés par année civile (13 j en 2026), cumulés au prorata mensuel, remis à zéro au 31 décembre. Solde = acquis − pris à fin du mois affiché. H. supp = total du mois. Tout est en jours ouvrés (lun-ven), base <strong>vérifiée sur les bulletins de paie 2026</strong> (+2,08/mois, 25 j/an, décompte en jours ouvrés). Comme le bulletin, le solde se compose de deux poches : les <strong>CP N-1</strong> (acquis avant le 01/06/2026, consommés en priorité) expirent au 31/05 de la période en cours — c'est la colonne « dont expire » ; les <strong>CP N</strong> en cours d'acquisition ont un an de plus.</div>
       </div>
     </div>
   </div>
@@ -250,11 +250,14 @@ function renderExpiryAlerts() {
   const ty = today.getFullYear(), tm = today.getMonth();
   const groups = [];
 
-  // CP — échéance 31 mai (solde de la période de référence en cours)
-  const cpPeople = PEOPLE
-    .map(p => ({ p, solde: cpAcquired(p, ty, tm) - cpTakenInRef(p, ty, tm) }))
+  // CP — seule la poche N-1 expire au 31/05 de la période en cours. La poche N a un an de plus :
+  // alarmer sur le solde total surestimait massivement l'urgence (158 j affichés contre 16,5 réels).
+  const cpN1 = PEOPLE.map(p => ({ p, solde: cpPots(p, ty, tm).n1 }))
     .filter(x => x.solde > 0.01).sort((a, b) => b.solde - a.solde);
-  if (cpPeople.length) groups.push({ type: 'CP', deadline: nextOccurrence(4, 31), people: cpPeople });
+  if (cpN1.length) groups.push({ type: 'CP N-1', deadline: cpRefEnd(ty, tm), people: cpN1 });
+  const cpN = PEOPLE.map(p => ({ p, solde: cpPots(p, ty, tm).n }))
+    .filter(x => x.solde > 0.01).sort((a, b) => b.solde - a.solde);
+  if (cpN.length) groups.push({ type: 'CP N', deadline: cpRefEnd(ty + (tm >= 5 ? 1 : 0), tm >= 5 ? 5 : 4), people: cpN });
 
   // RTT — échéance 31 décembre (cadres au forfait : Charles)
   const rttPeople = PEOPLE.filter(p => COLLABORATORS[p].rtt)
@@ -366,6 +369,33 @@ function countTypeBetween(person, type, startIdx, endIdx) {
 function cpTakenInRef(person, y, m) {
   return countTypeBetween(person, 'CP', Math.max(cpRefStart(y, m), ACCRUAL_IDX), mIdx(y, m));
 }
+// --- Les DEUX poches du bulletin de paie ---
+// Le bulletin ne tient pas un solde unique mais deux compteurs d'échéances différentes :
+//   CP N-1 : acquis la période précédente. Consommés EN PRIORITÉ. Expirent au 31/05 de la période en cours.
+//   CP N   : en cours d'acquisition. Utilisables jusqu'au 31/05 suivant.
+// Vérifié sur les bulletins de Charles : au 31/08/2026, N-1 = 1,00 et N = 6,25 (total 7,25).
+// On itère période par période depuis ACCRUAL_START : à chaque bascule du 31/05, le reliquat de N-1
+// est perdu et N devient le nouveau N-1.
+function cpPots(person, y, m) {
+  const viewIdx = mIdx(y, m);
+  let n1 = (OPENING_BALANCE[person] && OPENING_BALANCE[person].cp) || 0;
+  let n = 0, start = ACCRUAL_IDX;
+  if (viewIdx < start) return { n1, n: 0, total: n1 };
+  for (;;) {
+    const end = Math.min(viewIdx, start + 11);
+    n = CP_PER_MONTH * (end - start + 1);
+    const taken = countTypeBetween(person, 'CP', start, end);
+    const fromN1 = Math.min(n1, taken);
+    n1 -= fromN1;
+    n  -= (taken - fromN1);
+    if (end >= viewIdx) break;
+    n1 = n; n = 0; start = end + 1;   // bascule au 31/05 : le reliquat de N-1 est perdu
+  }
+  return { n1, n, total: n1 + n };
+}
+// Fin de la période de référence contenant (y,m) : le 31/05 qui la clôt.
+function cpRefEnd(y, m) { return new Date((m >= 5 ? y + 1 : y), 4, 31); }
+
 // RTT pris dans l'année civile affichée (1er janvier → mois affiché)
 function rttTakenInYear(person, y, m) {
   return countTypeBetween(person, 'RTT', mIdx(y, 0), mIdx(y, m));
@@ -375,7 +405,7 @@ function renderCounters() {
   const lastDay = new Date(currentYear, currentMonth + 1, 0).getDate();
   document.getElementById('counters-date').textContent = `au ${lastDay} ${MONTHS_FR[currentMonth].toLowerCase()} ${currentYear}`;
   let html = '<thead><tr><th class="name" style="text-align:left">Collaborateur</th>'
-    + '<th>CP acquis</th><th>CP pris</th><th>CP solde</th>'
+    + '<th>CP acquis</th><th>CP pris</th><th>CP solde</th><th>dont expire<br>au 31/05</th>'
     + '<th>RTT acquis</th><th>RTT pris</th><th>RTT solde</th>'
     + '<th>H. supp mois</th></tr></thead><tbody>';
   for (const p of PEOPLE) {
@@ -388,6 +418,8 @@ function renderCounters() {
     html += `<tr><td class="name" style="--c:${c}">${COLLABORATORS[p].shortName}</td>`;
     html += `<td class="num">${fmtNum(cpAcq)}</td><td class="num">${fmtNum(cpTaken)}</td>`;
     html += `<td class="num" style="color:${cpSolde < 0 ? '#dc2626' : '#166534'}">${fmtNum(cpSolde)}</td>`;
+    const n1 = cpPots(p, currentYear, currentMonth).n1;
+    html += `<td class="num" style="color:${n1 > 0.01 ? '#b45309' : '#94a3b8'}">${n1 > 0.01 ? fmtNum(Math.round(n1 * 10) / 10) : '—'}</td>`;
     if (canRtt) {
       const rttAcq = rttAcquired(p, currentYear, currentMonth);
       const rttTaken = rttTakenInYear(p, currentYear, currentMonth);
@@ -488,6 +520,10 @@ function downloadPDF() {
       fmtNum(cpAcq), fmtNum(cpTaken),
       { content: fmtNum(cpSolde), styles: { fontStyle: 'bold', textColor: cpSolde < 0 ? [220,38,38] : [22,101,52] } },
     ];
+    const cpN1 = cpPots(p, currentYear, currentMonth).n1;
+    row.push(cpN1 > 0.01
+      ? { content: fmtNum(Math.round(cpN1 * 10) / 10), styles: { fontStyle: 'bold', textColor: [180,83,9] } }
+      : { content: '-', styles: grey });
     if (canRtt) {
       const ra = rttAcquired(p, currentYear, currentMonth), rt = rttTakenInYear(p, currentYear, currentMonth), rs = ra - rt;
       row.push(fmtNum(ra), fmtNum(rt), { content: fmtNum(rs), styles: { fontStyle: 'bold', textColor: rs < 0 ? [220,38,38] : [109,40,217] } });

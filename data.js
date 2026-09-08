@@ -133,13 +133,14 @@ const ACCRUAL_START = { y: 2026, m: 5 };   // début du suivi des CP : juin 2026
 // RTT : pas de dotation fixe. Charles est cadre au forfait jours → les jours de repos sont
 // recalculés chaque année civile par la formule forfait (voir FORFAIT_DAYS + rttAnnualForYear plus bas).
 // Report / solde initial DES CP au 31/05/2026 (soldes à fin mai, hors jours posés après cette date).
-// ⚠️ Ces chiffres viennent du logiciel de pointage et son unité n'a pas pu être vérifiée. Deux indices
-// suggèrent une base OUVRABLES (17,5 = 2,5 × 7 et 5 = 2,5 × 2 tombent pile ; aucun solde ne tombe sur
-// un tiers, signature du 2,5/mois). Si c'est le cas, ce report est surévalué d'environ 1/6 une fois
-// converti en jours ouvrés. Il est laissé TEL QUEL volontairement : sous-évaluer un droit à congés
-// est plus préjudiciable que le surévaluer, et la correction se ferait à la baisse.
-// Pour trancher : un bulletin de paie d'août ou septembre 2026 indique le solde de CP et ce qui a été
-// décompté (ex. Émilie 17-28/08 → 10 j = base ouvrés, 11 ou 12 j = base ouvrables).
+// ✅ Base VÉRIFIÉE sur les bulletins de paie 2026 de Charles (janvier → août) : l'acquisition y
+// progresse de +2,08/mois pour un total de 25,00 sur 12 mois, et sa semaine du 15-19/06/2026 a été
+// décomptée 5 jours (et non 6). C'est donc bien une base JOURS OUVRÉS, sans règle du samedi.
+// Le report de Charles est confirmé au centime : bulletin de mai 2026 → solde 6,00 = la valeur ci-dessous.
+// L'app reproduit exactement les soldes des bulletins : 6,00 (mai) / 3,08 (juin) / 5,17 (juillet) /
+// 7,25 (août). Les soldes des cinq autres viennent du même logiciel, donc de la même base.
+// Ce report est la poche « CP N-1 » du bulletin : acquise avant le 01/06/2026, consommée en priorité,
+// et elle expire le 31/05/2027 (voir cpPots dans rh.html).
 // L'acquisition CP (2,5/mois) démarre ensuite en juin via ACCRUAL_START. Les RTT étant recalculés
 // chaque année par la formule, il n'y a pas de report manuel à saisir pour eux.
 const OPENING_BALANCE = {
@@ -304,6 +305,10 @@ function isWorkday(d) { const w = d.getDay(); return w !== 0 && w !== 6 && !isHo
 // Jours de repos d'un cadre au forfait, pour une année civile =
 //   jours calendaires − samedis/dimanches − 25 CP légaux − fériés tombant un jour ouvré − forfait annuel.
 // Ex. Charles 2026 (forfait 214 j) : 365 − 104 − 25 − 9 − 214 = 13.
+// Vérifié sur ses bulletins 2026 : +1,08/mois, forfait 214 confirmé. Le logiciel de paie cumule un
+// 1,08 arrondi, donc il affiche 12,96/an là où la formule donne 13 — écart de 0,04 max (0,02-0,03 sur
+// un solde mensuel). On garde 13 : c'est le résultat exact de la formule, l'écart est un arrondi
+// d'affichage côté paie, pas une différence de droit.
 const FORFAIT_DAYS  = { Charles: 214 };
 const CP_LEGAL_DAYS = 25;
 function daysInYear(year) { return ((year % 4 === 0 && year % 100 !== 0) || year % 400 === 0) ? 366 : 365; }
