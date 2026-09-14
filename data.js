@@ -79,7 +79,12 @@ const ABSENCES = {
     '2027-04-26': 'CP', '2027-04-27': 'CP', '2027-04-28': 'CP', '2027-04-29': 'CP', '2027-04-30': 'CP'
   },
   Flora:   { '2026-08-10': 'CP', '2026-08-11': 'CP', '2026-08-12': 'CP', '2026-08-13': 'CP', '2026-08-14': 'CP' },
-  Chiara:  { '2026-07-24': 'CP', '2026-09-07': 'CP', '2026-09-08': 'CP', '2026-09-09': 'CP', '2026-09-10': 'CP', '2026-09-11': 'CP' },
+  Chiara:  {
+    '2026-07-24': 'CP', '2026-09-07': 'CP', '2026-09-08': 'CP', '2026-09-09': 'CP', '2026-09-10': 'CP', '2026-09-11': 'CP',
+    // Arrêt maladie 14 → 16/09 (non décompté des CP). Remplacée par Dynah : le soir les 14 et 15
+    // (remplacement automatique), le matin le 16 par inversion avec Cédric (voir OVERRIDES).
+    '2026-09-14': 'AM', '2026-09-15': 'AM', '2026-09-16': 'AM'
+  },
   Cédric:  {
     '2026-06-01': 'PACS', '2026-06-02': 'PACS', '2026-06-03': 'PACS', '2026-06-04': 'PACS',
     // CP 31/07 → 11/08 (jours ouvrés ; week-ends 01-02 et 08-09/08 exclus)
@@ -242,6 +247,15 @@ const OVERRIDES = {
     TB4: {
       morning: { person: 'Cédric',  substituteFor: 'Chiara' },
       evening: { person: 'Charles', substituteFor: 'Cédric' }
+    }
+  },
+  // 16/09 : Chiara en arrêt maladie (parité 0 → Cédric=TB4 matin, Chiara=TB4 soir). Dynah la remplace
+  // sur toute la période, mais ce jour-là elle inverse et prend le matin ; Cédric bascule sur le soir.
+  // Les 14 et 15/09 ne sont volontairement PAS listés : le remplacement auto place déjà Dynah le soir.
+  '2026-09-16': {
+    TB4: {
+      morning: { person: 'Dynah',  substituteFor: 'Cédric' },
+      evening: { person: 'Cédric', substituteFor: 'Chiara' }
     }
   }
 };
