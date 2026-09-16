@@ -66,6 +66,8 @@ const MIN_Y = 2026, MIN_M = 5;                 // juin 2026 = premier mois visib
 // ===== Absences (pointage) =====
 // Type par jour : 'CP' | 'RTT' | 'AM' (arrêt maladie) | 'ABI' (absence injustifiée) | 'CS' (congé sans solde)
 //               | 'PACS' (congé pour événement familial — PACS, non décompté des CP/RTT)
+//               | 'CSUP' (congé supplémentaire offert par l'employeur — hors compteurs CP et RTT.
+//                 Ne pas confondre avec 'CS', le congé SANS SOLDE.)
 // RTT réservé à Charles. Toute absence = la personne ne travaille pas ce jour.
 const ABSENCES = {
   Emilie:  {
@@ -73,6 +75,8 @@ const ABSENCES = {
     // CP 17 → 28/08 (jours ouvrés ; week-end 22-23/08 exclu). 27-28/08 : remplacée (voir OVERRIDES).
     '2026-08-17': 'CP', '2026-08-18': 'CP', '2026-08-19': 'CP', '2026-08-20': 'CP', '2026-08-21': 'CP',
     '2026-08-24': 'CP', '2026-08-25': 'CP', '2026-08-26': 'CP', '2026-08-27': 'CP', '2026-08-28': 'CP',
+    // Absence du 16/09 : codée en AM, À CONFIRMER (nature de l'arrêt non encore certaine).
+    '2026-09-16': 'AM',
     // CP 18/04 -> 02/05/2027, valide le 01/09/2026 : 15 jours calendaires, 10 ouvres.
     // Week-ends 24-25/04 et 01-02/05 exclus (le 01/05, Fete du Travail, tombe un samedi).
     '2027-04-19': 'CP', '2027-04-20': 'CP', '2027-04-21': 'CP', '2027-04-22': 'CP', '2027-04-23': 'CP',
@@ -105,14 +109,14 @@ const ABSENCES = {
   Charles: {
     // H1 : congés payés
     '2026-06-15': 'CP', '2026-06-16': 'CP', '2026-06-17': 'CP', '2026-06-18': 'CP', '2026-06-19': 'CP',
-    // H2 : on privilégie les RTT, mais SEULEMENT tant qu'ils sont acquis sur le compteur (cumul mensuel
-    // ~1,08/mois). Au moment du congé Charles a ~9 RTT acquis → 9 RTT posés (24-28/08 + 21-24/09),
-    // le reste de l'été en CP. Ainsi le solde RTT n'est jamais négatif. Les RTT restants (~4) se posent
-    // plus tard dans l'année, une fois acquis, pour ne pas les perdre au 31/12.
+    // H2 : on privilégie les RTT tant qu'ils sont acquis sur le compteur (~1,08/mois), pour ne pas
+    // tomber en solde négatif ni en perdre au 31/12.
     '2026-08-24': 'RTT', '2026-08-25': 'RTT', '2026-08-26': 'RTT', '2026-08-27': 'RTT', '2026-08-28': 'RTT',
-    '2026-09-21': 'RTT', '2026-09-22': 'RTT', '2026-09-23': 'RTT', '2026-09-24': 'RTT',
-    '2026-09-25': 'CP', '2026-09-28': 'CP', '2026-09-29': 'CP', '2026-09-30': 'CP',
-    '2026-10-01': 'CP', '2026-10-02': 'CP'
+    // 21 → 25/09 : les 5 jours offerts par la DRH. Codés CSUP, donc hors compteurs CP et RTT :
+    // c'est bien un cadeau, il ne consomme aucun droit acquis.
+    '2026-09-21': 'CSUP', '2026-09-22': 'CSUP', '2026-09-23': 'CSUP', '2026-09-24': 'CSUP', '2026-09-25': 'CSUP',
+    // 28/09 → 02/10 : RTT (10 RTT posés sur l'année au total, il en restera 3 à placer avant le 31/12).
+    '2026-09-28': 'RTT', '2026-09-29': 'RTT', '2026-09-30': 'RTT', '2026-10-01': 'RTT', '2026-10-02': 'RTT'
   }
 };
 
@@ -124,6 +128,7 @@ const POINTAGE_LABELS = {
   AM:  'Arrêt maladie',
   ABI: 'Absence injustifiée',
   CS:  'Congé sans solde',
+  CSUP:'Congé supplémentaire (employeur)',
   PACS:'Congé PACS'
 };
 
@@ -253,6 +258,10 @@ const OVERRIDES = {
   // sur toute la période, mais ce jour-là elle inverse et prend le matin ; Cédric bascule sur le soir.
   // Les 14 et 15/09 ne sont volontairement PAS listés : le remplacement auto place déjà Dynah le soir.
   '2026-09-16': {
+    // Émilie est absente elle aussi ce jour-là. Sans cette ligne TB3, applySubs (qui tourne AVANT
+    // applyOverrides) place Dynah sur le soir de TB3, et l'override la reprend pour le matin de TB4 :
+    // elle se retrouvait sur deux shifts en même temps. On fixe donc Charles sur le soir de TB3.
+    TB3: { evening: { person: 'Charles', substituteFor: 'Emilie' } },
     TB4: {
       morning: { person: 'Dynah',  substituteFor: 'Cédric' },
       evening: { person: 'Cédric', substituteFor: 'Chiara' }

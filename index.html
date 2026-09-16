@@ -610,6 +610,16 @@ function collectWarnings(sch) {
       if (blk.morning.person && blk.morning.person === blk.evening.person) warns.push(`${b} : ${SN(blk.morning.person)} sur matin ET soir`);
     }
   }
+  // Doublon INTER-bâtiments : applySubs tourne avant applyOverrides et ne peut pas anticiper qui
+  // l'override va mobiliser. Une même personne pouvait donc se retrouver sur TB3 et TB4 le même
+  // jour sans qu'aucun warning ne le signale (cas rencontré le 16/09/2026 avec Dynah).
+  const parPersonne = {};
+  for (const b of ['TB3','TB4']) {
+    const blk = sch[b];
+    const ps = blk.slots ? blk.slots.map(s => s.person) : [blk.morning.person, blk.evening.person];
+    for (const p of ps) if (p) (parPersonne[p] = parPersonne[p] || new Set()).add(b);
+  }
+  for (const p in parPersonne) if (parPersonne[p].size > 1) warns.push(`${SN(p)} est sur TB3 ET TB4 le même jour`);
   return warns;
 }
 
