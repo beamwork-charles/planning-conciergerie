@@ -316,7 +316,7 @@ function renderTable() {
         const code = st.code;
         const sty = CODE_STYLE[code] || CODE_STYLE.P;
         const ex = personExtra(p, ds);
-        const ot = ex ? `<span class="ot">+${ex.hours}h</span>` : '';
+        const ot = ex ? `<span class="ot" style="color:${ex.hours < 0 ? '#dc2626' : '#b45309'}">${ex.hours > 0 ? '+' : ''}${ex.hours}h</span>` : '';
         body += `<td class="c ${isToday ? 'todaycol' : ''}" style="background:${sty.bg};color:${sty.fg}"><span class="cd">${code}</span>${ot}</td>`;
       }
     }
@@ -430,7 +430,7 @@ function renderCounters() {
     } else {
       html += `<td class="greyed">—</td><td class="greyed">—</td><td class="greyed">—</td>`;
     }
-    html += `<td class="num">${ot ? '+' + ot + 'h' : '—'}</td></tr>`;
+    html += `<td class="num" style="color:${ot < 0 ? '#dc2626' : '#b45309'}">${ot ? (ot > 0 ? '+' : '') + ot + 'h' : '—'}</td></tr>`;
   }
   html += '</tbody>';
   document.getElementById('counters-table').innerHTML = html;
@@ -531,7 +531,7 @@ function downloadPDF() {
     } else {
       row.push({ content: '-', styles: grey }, { content: '-', styles: grey }, { content: '-', styles: grey });
     }
-    row.push(ot ? `+${ot}h` : '-');
+    row.push(ot ? `${ot > 0 ? '+' : ''}${ot}h` : '-');
     return row;
   });
   const cY = doc.lastAutoTable.finalY + 6;

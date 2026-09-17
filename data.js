@@ -165,9 +165,14 @@ const OPENING_BALANCE = {
 // solde (CS) ne génère pas de CP, et l'arrêt maladie non pro génère 2 j/mois (loi 2024) — ces
 // réductions ne sont PAS appliquées automatiquement dans les compteurs (à ajuster si besoin).
 
-// Heures supplémentaires — { 'AAAA-MM-JJ': [ { person, label, hours } ] }
+// Compteur d'heures — { 'AAAA-MM-JJ': [ { person, label, hours } ] }
+// hours > 0 : heures supplémentaires faites. hours < 0 : heures DUES, à rattraper plus tard.
+// Le total du mois apparaît dans la colonne « H. supp mois » du pointage RH (en rouge si négatif).
 const EXTRA_HOURS = {
-  '2026-06-24': [ { person: 'Emilie', label: '19h–22h', hours: 3 } ]
+  '2026-06-24': [ { person: 'Emilie', label: '19h–22h', hours: 3 } ],
+  // Cédric finit à 16h au lieu de 19h : 3 h dues, à rattraper. Quand il les aura faites,
+  // ajouter une entrée positive à la date du rattrapage pour solder le compteur.
+  '2026-09-25': [ { person: 'Cédric', label: 'fin à 16h au lieu de 19h', hours: -3 } ]
 };
 
 // Arrangements durables entre binômes, par jour de la semaine — écrasent l'alternance de parité
@@ -257,6 +262,18 @@ const OVERRIDES = {
   // 16/09 : Chiara en arrêt maladie (parité 0 → Cédric=TB4 matin, Chiara=TB4 soir). Dynah la remplace
   // sur toute la période, mais ce jour-là elle inverse et prend le matin ; Cédric bascule sur le soir.
   // Les 14 et 15/09 ne sont volontairement PAS listés : le remplacement auto place déjà Dynah le soir.
+  // 25/09 : Cédric ne fait que 11h-16h (3 h dues, voir EXTRA_HOURS) et Dynah assure la fin de
+  // service 16h-19h. TB4 passe donc en 3 créneaux : découper un shift entre deux personnes se
+  // modélise avec 'slots', chaque créneau portant son propre horaire.
+  '2026-09-25': {
+    TB4: {
+      slots: [
+        { person: 'Chiara', time: '8h-16h'  },
+        { person: 'Cédric', time: '11h-16h' },
+        { person: 'Dynah',  time: '16h-19h', substituteFor: 'Cédric' }
+      ]
+    }
+  },
   '2026-09-16': {
     // Émilie est absente elle aussi ce jour-là. Sans cette ligne TB3, applySubs (qui tourne AVANT
     // applyOverrides) place Dynah sur le soir de TB3, et l'override la reprend pour le matin de TB4 :

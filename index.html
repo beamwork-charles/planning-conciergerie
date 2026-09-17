@@ -545,12 +545,15 @@ function applyOverrides(schedule, dateStr) {
         schedule[b][slot].substituteFor = o.substituteFor ?? null;
       }
     }
-    if (ov[b].slots && schedule[b].slots) {
-      schedule[b].slots = ov[b].slots.map(o => {
-        const sh = mkShift('9h-17h', o.person ?? null);
+    // Un override 'slots' remplace tout le bloc du bâtiment par une liste de créneaux, même un
+    // jour normal : c'est ainsi qu'on découpe un shift entre deux personnes (ex. 25/09/2026).
+    // Chaque créneau porte son propre horaire ; à défaut on garde 9h-17h (cas des jours réduits).
+    if (ov[b].slots) {
+      schedule[b] = { slots: ov[b].slots.map(o => {
+        const sh = mkShift(o.time ?? '9h-17h', o.person ?? null);
         sh.substituteFor = o.substituteFor ?? null;
         return sh;
-      });
+      }) };
     }
   }
 }
@@ -702,7 +705,7 @@ function renderManagers(dateStr) {
 function renderBuildingMini(name, blk, dateStr, reducedBadge) {
   const badge = reducedBadge ? `<span class="bld-reduced">9h-17h</span>` : '';
   let html = `<div class="bld-card ${name.toLowerCase()}"><div class="bld-label">${name}${badge}</div>`;
-  if (blk.slots) html += blk.slots.map(s => renderShiftBar(s, '9h-17h')).join('');
+  if (blk.slots) html += blk.slots.map(s => renderShiftBar(s, s.time || '9h-17h')).join('');
   else { html += renderShiftBar(blk.morning, blk.morning.time); html += renderShiftBar(blk.evening, blk.evening.time); }
   html += renderOffRows(name, dateStr);
   html += renderExtraHours(dateStr, name);
@@ -733,8 +736,9 @@ function renderExtraHours(dateStr, building) {
     const meta = COLLABORATORS[e.person];
     const cls = meta ? `clr-${meta.color}` : 'clr-none';
     const name = meta ? meta.shortName : e.person;
-    const hrs = e.hours ? ` (+${e.hours}h)` : '';
-    return `<span class="extra-chip ${cls}">⏱ ${name} · ${e.label}${hrs}</span>`;
+    const hrs = e.hours ? ` (${e.hours > 0 ? '+' : ''}${e.hours}h)` : '';
+    const icon = e.hours < 0 ? '↩' : '⏱';   // ↩ = heures dues, à rattraper
+    return `<span class="extra-chip ${cls}">${icon} ${name} · ${e.label}${hrs}</span>`;
   }).join('');
   return `<div class="extra-row">${chips}</div>`;
 }
