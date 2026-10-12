@@ -91,7 +91,9 @@ const ABSENCES = {
     '2026-07-24': 'CP', '2026-09-07': 'CP', '2026-09-08': 'CP', '2026-09-09': 'CP', '2026-09-10': 'CP', '2026-09-11': 'CP',
     // Arrêt maladie 14 → 16/09 (non décompté des CP). Remplacée par Dynah : le soir les 14 et 15
     // (remplacement automatique), le matin le 16 par inversion avec Cédric (voir OVERRIDES).
-    '2026-09-14': 'AM', '2026-09-15': 'AM', '2026-09-16': 'AM'
+    '2026-09-14': 'AM', '2026-09-15': 'AM', '2026-09-16': 'AM',
+    // CP jeudi 31/12 (1 jour ouvré). Horaires réduits ce jour-là : Cédric assure seul TB4 en 9h-17h.
+    '2026-12-31': 'CP'
   },
   Cédric:  {
     '2026-06-01': 'PACS', '2026-06-02': 'PACS', '2026-06-03': 'PACS', '2026-06-04': 'PACS',
