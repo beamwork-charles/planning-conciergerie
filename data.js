@@ -77,6 +77,8 @@ const ABSENCES = {
     '2026-08-24': 'CP', '2026-08-25': 'CP', '2026-08-26': 'CP', '2026-08-27': 'CP', '2026-08-28': 'CP',
     // Absence du 16/09 : codée en AM, À CONFIRMER (nature de l'arrêt non encore certaine).
     '2026-09-16': 'AM',
+    // Arrêt maladie jeudi 15/10 (1 jour). Dynah la remplace sur le soir (remplacement automatique).
+    '2026-10-15': 'AM',
     // CP 18/04 -> 02/05/2027, valide le 01/09/2026 : 15 jours calendaires, 10 ouvres.
     // Week-ends 24-25/04 et 01-02/05 exclus (le 01/05, Fete du Travail, tombe un samedi).
     '2027-04-19': 'CP', '2027-04-20': 'CP', '2027-04-21': 'CP', '2027-04-22': 'CP', '2027-04-23': 'CP',
