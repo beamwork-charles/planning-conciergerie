@@ -87,7 +87,10 @@ const ABSENCES = {
   Flora:   {
     '2026-08-10': 'CP', '2026-08-11': 'CP', '2026-08-12': 'CP', '2026-08-13': 'CP', '2026-08-14': 'CP',
     // CP 22 → 23/10 (2 jours ouvrés, jeudi et vendredi). Elle travaille bien les 20 et 21/10.
-    '2026-10-22': 'CP', '2026-10-23': 'CP'
+    '2026-10-22': 'CP', '2026-10-23': 'CP',
+    // CP lundi 28 et mardi 29/12 (2 jours ouvrés). Période des fêtes en horaires réduits :
+    // Émilie assure seule TB3 en 9h-17h, sans renfort (règle du mode réduit).
+    '2026-12-28': 'CP', '2026-12-29': 'CP'
   },
   Chiara:  {
     '2026-07-24': 'CP', '2026-09-07': 'CP', '2026-09-08': 'CP', '2026-09-09': 'CP', '2026-09-10': 'CP', '2026-09-11': 'CP',
@@ -113,7 +116,10 @@ const ABSENCES = {
     '2026-08-03': 'CP', '2026-08-04': 'CP', '2026-08-05': 'CP', '2026-08-06': 'CP', '2026-08-07': 'CP',
     '2026-09-09': 'CP', '2026-09-10': 'CP', '2026-09-11': 'CP',
     '2026-09-21': 'CP',
-    '2026-10-13': 'CP'
+    '2026-10-13': 'CP',
+    // CP jeudi 19 et vendredi 20/11 (2 jours ouvrés). Aucun remplacement : les quatre concierges
+    // sont présents, Charles reste seul renfort ces deux jours.
+    '2026-11-19': 'CP', '2026-11-20': 'CP'
   },
   Charles: {
     // H1 : congés payés
