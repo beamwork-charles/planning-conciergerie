@@ -250,22 +250,35 @@ function nextOccurrence(month, day) {           // prochaine date month/day (moi
 function alertLevel(daysLeft) { return daysLeft <= 30 ? 'red' : daysLeft <= 90 ? 'amber' : 'info'; }
 function alertIcon(level)     { return level === 'red' ? '⛔' : level === 'amber' ? '⏰' : '📅'; }
 
+// « À planifier » = droits acquis à ce jour − jours DÉJÀ SAISIS dans la poche, y compris ceux à venir.
+// Le solde des compteurs s'arrête au mois affiché (comme le bulletin) : s'en servir ici faisait réclamer
+// des congés déjà posés plus loin (ex. les RTT de Charles du 22 au 24/12, encore « à planifier » en novembre).
+function cpToPlan(person, y, m) {
+  const endY = m >= 5 ? y + 1 : y;                       // année du 31/05 qui clôt la période en cours
+  const atEnd  = cpPots(person, endY, 4);                // tous les CP saisis jusqu'à ce 31/05 déduits
+  const atNext = cpPots(person, endY + 1, 4);            // la poche N actuelle expire au 31/05 suivant
+  const stillToAccrue = CP_PER_MONTH * (mIdx(endY, 4) - mIdx(y, m));   // pas encore acquis d'ici là
+  return { n1: atEnd.n1, n: atNext.n1 - stillToAccrue };
+}
+
 function renderExpiryAlerts() {
   const ty = today.getFullYear(), tm = today.getMonth();
   const groups = [];
 
   // CP — seule la poche N-1 expire au 31/05 de la période en cours. La poche N a un an de plus :
   // alarmer sur le solde total surestimait massivement l'urgence (158 j affichés contre 16,5 réels).
-  const cpN1 = PEOPLE.map(p => ({ p, solde: cpPots(p, ty, tm).n1 }))
+  const endY = tm >= 5 ? ty + 1 : ty;
+  const toPlan = Object.fromEntries(PEOPLE.map(p => [p, cpToPlan(p, ty, tm)]));
+  const cpN1 = PEOPLE.map(p => ({ p, solde: toPlan[p].n1 }))
     .filter(x => x.solde > 0.01).sort((a, b) => b.solde - a.solde);
-  if (cpN1.length) groups.push({ type: 'CP N-1', deadline: cpRefEnd(ty, tm), people: cpN1 });
-  const cpN = PEOPLE.map(p => ({ p, solde: cpPots(p, ty, tm).n }))
+  if (cpN1.length) groups.push({ type: 'CP N-1', deadline: new Date(endY, 4, 31), people: cpN1 });
+  const cpN = PEOPLE.map(p => ({ p, solde: toPlan[p].n }))
     .filter(x => x.solde > 0.01).sort((a, b) => b.solde - a.solde);
-  if (cpN.length) groups.push({ type: 'CP N', deadline: cpRefEnd(ty + (tm >= 5 ? 1 : 0), tm >= 5 ? 5 : 4), people: cpN });
+  if (cpN.length) groups.push({ type: 'CP N', deadline: new Date(endY + 1, 4, 31), people: cpN });
 
-  // RTT — échéance 31 décembre (cadres au forfait : Charles)
+  // RTT — échéance 31 décembre (cadres au forfait : Charles). Acquis à ce jour − RTT saisis sur toute l'année.
   const rttPeople = PEOPLE.filter(p => COLLABORATORS[p].rtt)
-    .map(p => ({ p, solde: rttAcquired(p, ty, tm) - rttTakenInYear(p, ty, tm) }))
+    .map(p => ({ p, solde: rttAcquired(p, ty, tm) - rttTakenInYear(p, ty, 11) }))
     .filter(x => x.solde > 0.01).sort((a, b) => b.solde - a.solde);
   if (rttPeople.length) groups.push({ type: 'RTT', deadline: nextOccurrence(11, 31), people: rttPeople });
 
