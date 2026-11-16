@@ -68,7 +68,12 @@ const MIN_Y = 2026, MIN_M = 5;                 // juin 2026 = premier mois visib
 //               | 'PACS' (congé pour événement familial — PACS, non décompté des CP/RTT)
 //               | 'CSUP' (congé supplémentaire offert par l'employeur — hors compteurs CP et RTT.
 //                 Ne pas confondre avec 'CS', le congé SANS SOLDE.)
-// RTT réservé à Charles. Toute absence = la personne ne travaille pas ce jour.
+// RTT réservé à Charles. Une absence en chaîne ('CP') = la personne ne travaille pas ce jour.
+// DEMI-JOURNÉE : objet { type, half } à la place de la chaîne, ex. { type: 'CP', half: 'aprem' }.
+//   half = la moitié POSÉE (non travaillée) : 'matin' ou 'aprem'. Décomptée 0,5 j dans les compteurs.
+//   La personne reste au planning et ne fait que l'autre moitié de son shift (8h-16h → 8h-12h ou 12h-16h).
+//   Poser la moitié que l'autre concierge du bâtiment couvre déjà (après-midi pour le shift du matin,
+//   matin pour celui du soir) : sinon l'amplitude a un trou, signalé par le « ! » du planning.
 const ABSENCES = {
   Emilie:  {
     '2026-06-12': 'CP', '2026-07-13': 'CP',
@@ -97,6 +102,11 @@ const ABSENCES = {
     // Arrêt maladie 14 → 16/09 (non décompté des CP). Remplacée par Dynah : le soir les 14 et 15
     // (remplacement automatique), le matin le 16 par inversion avec Cédric (voir OVERRIDES).
     '2026-09-14': 'AM', '2026-09-15': 'AM', '2026-09-16': 'AM',
+    // 17, 18 et 25/11 : 2 jours ouvrés de CP au total (deux demi-journées + une journée entière).
+    // 17/11 : Chiara est du matin → elle fait 8h-12h, Cédric (11h-19h) couvre l'après-midi.
+    // 18/11 : journée entière, Dynah prend son shift du matin (remplacement automatique).
+    // 25/11 : Chiara est du soir → elle fait 15h-19h, Cédric (8h-16h) couvre le matin.
+    '2026-11-17': { type: 'CP', half: 'aprem' }, '2026-11-18': 'CP', '2026-11-25': { type: 'CP', half: 'matin' },
     // CP jeudi 31/12 (1 jour ouvré). Horaires réduits ce jour-là : Cédric assure seul TB4 en 9h-17h.
     '2026-12-31': 'CP'
   },
@@ -130,8 +140,12 @@ const ABSENCES = {
     // 21 → 25/09 : les 5 jours offerts par la DRH. Codés CSUP, donc hors compteurs CP et RTT :
     // c'est bien un cadeau, il ne consomme aucun droit acquis.
     '2026-09-21': 'CSUP', '2026-09-22': 'CSUP', '2026-09-23': 'CSUP', '2026-09-24': 'CSUP', '2026-09-25': 'CSUP',
-    // 28/09 → 02/10 : RTT (10 RTT posés sur l'année au total, il en restera 3 à placer avant le 31/12).
-    '2026-09-28': 'RTT', '2026-09-29': 'RTT', '2026-09-30': 'RTT', '2026-10-01': 'RTT', '2026-10-02': 'RTT'
+    // 28/09 → 02/10 : RTT (10 RTT posés à ce stade, il en restait 3 à placer avant le 31/12).
+    '2026-09-28': 'RTT', '2026-09-29': 'RTT', '2026-09-30': 'RTT', '2026-10-01': 'RTT', '2026-10-02': 'RTT',
+    // Fêtes : off les 22, 23, 24 et 28/12 (4 jours ouvrés). Les 3 derniers RTT 2026 sur 22 → 24/12
+    // (13/13 posés, rien de perdu au 31/12), puis 1 CP le 28/12, pris sur la poche N-1.
+    '2026-12-22': 'RTT', '2026-12-23': 'RTT', '2026-12-24': 'RTT',
+    '2026-12-28': 'CP'
   }
 };
 
@@ -418,8 +432,24 @@ function getWeekParity(d) {
 const SN = p => COLLABORATORS[p]?.shortName || p;
 
 // ===== Accès aux absences / heures supp =====
-function absenceType(person, dateStr) { const a = ABSENCES[person]; return (a && a[dateStr]) || null; }
-function isAbsent(person, dateStr) { return !!absenceType(person, dateStr); }
+// Entrée normalisée : { type, half } (half = null pour une journée entière), ou null si présent.
+function absenceEntry(person, dateStr) {
+  const v = ABSENCES[person]?.[dateStr];
+  if (!v) return null;
+  return typeof v === 'string' ? { type: v, half: null } : { type: v.type, half: v.half || null };
+}
+function absenceType(person, dateStr) { return absenceEntry(person, dateStr)?.type || null; }
+function halfDayOff(person, dateStr) { return absenceEntry(person, dateStr)?.half || null; }
+// Absent TOUTE la journée. Une demi-journée ne retire pas la personne du planning : elle garde
+// son shift, réduit de moitié (voir applyHalfDays dans index.html).
+function isAbsent(person, dateStr) { const e = absenceEntry(person, dateStr); return !!e && !e.half; }
+// Moitié travaillée d'un shift quand l'autre est posée : 8h-16h → 8h-12h (aprem posée) ou 12h-16h.
+function halfShiftTime(time, half) {
+  const m = /^(\d+)h-(\d+)h$/.exec(time || '');
+  if (!m) return time;
+  const a = +m[1], b = +m[2], mid = (a + b) / 2;
+  return half === 'matin' ? `${mid}h-${b}h` : `${a}h-${mid}h`;
+}
 function personExtra(person, dateStr) {
   return (EXTRA_HOURS[dateStr] || []).find(e => e.person === person) || null;
 }

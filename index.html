@@ -526,6 +526,7 @@ function genDay(date) {
   const absentToday = new Set();
   for (const p of Object.keys(COLLABORATORS)) if (isAbsent(p, dateStr)) absentToday.add(p);
   applySubs(schedule, absentToday);
+  applyHalfDays(schedule, dateStr);
   applyOverrides(schedule, dateStr);
   schedule.dynah   = computeStatus('Dynah', schedule, absentToday);
   schedule.charles = computeStatus('Charles', schedule, absentToday);
@@ -533,6 +534,37 @@ function genDay(date) {
   return schedule;
 }
 function mkShift(time, person) { return { time, person, defaultPerson: person, swapped: false, substituteFor: null }; }
+// Demi-journées (ABSENCES { type, half }) : la personne garde son shift mais n'en fait que la moitié.
+// Pas de renfort automatique : si la moitié posée laisse un trou, collectWarnings le signale.
+function applyHalfDays(schedule, dateStr) {
+  for (const b of ['TB3','TB4']) {
+    const blk = schedule[b];
+    for (const s of (blk.slots || [blk.morning, blk.evening])) {
+      const half = s.person && halfDayOff(s.person, dateStr);
+      if (!half) continue;
+      s.time = halfShiftTime(s.time, half);
+      s.halfOff = absenceType(s.person, dateStr);   // ex. 'CP' → note « ½ journée CP »
+    }
+  }
+}
+// Plages de [from, to] (en heures) qu'aucun shift ne couvre. [] si un horaire n'est pas lisible.
+function coverageGaps(shifts, from, to) {
+  const iv = [];
+  for (const s of shifts) {
+    const m = /^(\d+)h-(\d+)h$/.exec(s.time || '');
+    if (!m) return [];
+    iv.push([+m[1], +m[2]]);
+  }
+  iv.sort((x, y) => x[0] - y[0]);
+  const gaps = [];
+  let cur = from;
+  for (const [a, z] of iv) {
+    if (a > cur) gaps.push([cur, Math.min(a, to)]);
+    cur = Math.max(cur, z);
+  }
+  if (cur < to) gaps.push([cur, to]);
+  return gaps.filter(([a, z]) => z > a);
+}
 function applyOverrides(schedule, dateStr) {
   const ov = OVERRIDES[dateStr];
   if (!ov) return;
@@ -623,6 +655,15 @@ function collectWarnings(sch) {
     for (const p of ps) if (p) (parPersonne[p] = parPersonne[p] || new Set()).add(b);
   }
   for (const p in parPersonne) if (parPersonne[p].size > 1) warns.push(`${SN(p)} est sur TB3 ET TB4 le même jour`);
+  // Trou dans l'amplitude d'ouverture (8h-19h, 9h-17h en réduit), typiquement une demi-journée posée
+  // sur la mauvaise moitié du shift. Un shift sans personne est déjà signalé plus haut.
+  for (const b of ['TB3','TB4']) {
+    const blk = sch[b];
+    const shifts = blk.slots || [blk.morning, blk.evening];
+    if (shifts.some(s => !s.person)) continue;
+    const [from, to] = sch[`reduced${b}`] ? [9, 17] : [8, 19];
+    for (const [a, z] of coverageGaps(shifts, from, to)) warns.push(`${b} : ${a}h-${z}h non couvert`);
+  }
   return warns;
 }
 
@@ -725,7 +766,8 @@ function renderShiftBar(shift, label) {
   const colorClass = meta ? `clr-${meta.color}` : 'clr-none';
   // Personne hors équipe (ex. remplaçant·e externe placé·e via OVERRIDES) : on affiche son nom, style neutre.
   const nm = meta ? meta.shortName : (shift.person || '⚠️ Aucun');
-  const sub = shift.substituteFor ? `<span class="sub-note">remplace ${SN(shift.substituteFor)}</span>` : '';
+  const sub = (shift.substituteFor ? `<span class="sub-note">remplace ${SN(shift.substituteFor)}</span>` : '')
+            + (shift.halfOff ? `<span class="sub-note">½ journée ${shift.halfOff}</span>` : '');
   return `<div class="shift-bar ${colorClass} ${shift.substituteFor ? 'is-sub' : ''} ${!shift.person ? 'is-none' : ''}">
       <span class="when">${label}</span><span class="name-wrap"><span class="name">${nm}</span>${sub}</span></div>`;
 }

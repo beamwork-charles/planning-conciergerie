@@ -211,8 +211,11 @@ function dayCode(person, dateStr) {
   const dow = d.getDay();
   if (dow === 0 || dow === 6) return { off: 'we' };
   if (isHoliday(d)) return { off: 'hol', label: isHoliday(d) };
-  return { code: absenceType(person, dateStr) || 'P' };
+  const e = absenceEntry(person, dateStr);
+  return { code: e ? e.type : 'P', half: e ? e.half : null };
 }
+// Libellé de case : « ½CP » pour une demi-journée (l'autre moitié est travaillée)
+const cellLabel = st => st.half ? `½${st.code}` : st.code;
 
 // ----- Comptage -----
 function sumExtra(person, month) {
@@ -317,7 +320,10 @@ function renderTable() {
         const sty = CODE_STYLE[code] || CODE_STYLE.P;
         const ex = personExtra(p, ds);
         const ot = ex ? `<span class="ot" style="color:${ex.hours < 0 ? '#dc2626' : '#b45309'}">${ex.hours > 0 ? '+' : ''}${ex.hours}h</span>` : '';
-        body += `<td class="c ${isToday ? 'todaycol' : ''}" style="background:${sty.bg};color:${sty.fg}"><span class="cd">${code}</span>${ot}</td>`;
+        // Demi-journée : case coupée en diagonale, moitié « présent » / moitié absence
+        const bg = st.half ? `linear-gradient(135deg, ${CODE_STYLE.P.bg} 50%, ${sty.bg} 50%)` : sty.bg;
+        const tip = st.half ? ` title="Demi-journée ${POINTAGE_LABELS[code] || code} (${st.half === 'matin' ? 'matin' : 'après-midi'} posé)"` : '';
+        body += `<td class="c ${isToday ? 'todaycol' : ''}" style="background:${bg};color:${sty.fg}"${tip}><span class="cd">${cellLabel(st)}</span>${ot}</td>`;
       }
     }
     body += '</tr>';
@@ -354,15 +360,17 @@ function rttAcquired(person, y, m) {
 
 // Jours ouvrés d'un type posés sur l'intervalle de mois [startIdx, endIdx] inclus.
 // On ignore les week-ends/fériés : un congé ne se consomme pas un jour non travaillé.
+// Une demi-journée compte 0,5.
 function countTypeBetween(person, type, startIdx, endIdx) {
   const a = ABSENCES[person] || {};
   let n = 0;
   for (const ds in a) {
-    if (a[ds] !== type) continue;
+    const e = absenceEntry(person, ds);
+    if (e.type !== type) continue;
     const d = parseD(ds);
     if (!isWorkday(d)) continue;
     const idx = mIdx(d.getFullYear(), d.getMonth());
-    if (idx >= startIdx && idx <= endIdx) n++;
+    if (idx >= startIdx && idx <= endIdx) n += e.half ? 0.5 : 1;
   }
   return n;
 }
@@ -439,7 +447,7 @@ function renderCounters() {
 // Recense ce qui figure réellement sur le mois affiché (codes, heures supp, férié)
 function monthContents() {
   const codes = new Set();
-  let hasExtra = false, hasHoliday = false;
+  let hasExtra = false, hasHoliday = false, hasHalf = false;
   const nbDays = new Date(currentYear, currentMonth + 1, 0).getDate();
   for (let i = 1; i <= nbDays; i++) {
     const d = new Date(currentYear, currentMonth, i);
@@ -448,20 +456,22 @@ function monthContents() {
     for (const p of PEOPLE) {
       const st = dayCode(p, ds);
       if (st.code) codes.add(st.code);
+      if (st.half) hasHalf = true;
       if (personExtra(p, ds)) hasExtra = true;
     }
   }
-  return { codes, hasExtra, hasHoliday };
+  return { codes, hasExtra, hasHoliday, hasHalf };
 }
 // Légende : n'affiche que les pointages présents sur le mois affiché
 function renderLegend() {
-  const { codes, hasExtra, hasHoliday } = monthContents();
+  const { codes, hasExtra, hasHoliday, hasHalf } = monthContents();
   let html = '';
   for (const code of CODE_ORDER) {
     if (!codes.has(code)) continue;
     const s = CODE_STYLE[code];
     html += `<span class="legend-chip"><span class="legend-box" style="background:${s.bg};color:${s.fg}">${code}</span>${POINTAGE_LABELS[code]}</span>`;
   }
+  if (hasHalf) html += `<span class="legend-chip"><span class="legend-box" style="background:linear-gradient(135deg, ${CODE_STYLE.P.bg} 50%, ${CODE_STYLE.CP.bg} 50%);color:${CODE_STYLE.CP.fg}">½</span>Demi-journée (0,5 j)</span>`;
   if (hasExtra) html += `<span class="legend-chip"><span class="legend-box" style="background:#fff;color:#b45309;border-color:#fcd34d">+h</span>Heures supp.</span>`;
   html += `<span class="legend-chip"><span class="legend-box" style="background:repeating-linear-gradient(135deg,#f1f5f9 0 4px,#e9eef4 4px 8px)"></span>${hasHoliday ? 'Week-end / Férié (F)' : 'Week-end'}</span>`;
   document.getElementById('legend').innerHTML = html;
@@ -491,10 +501,11 @@ function downloadPDF() {
       if (dow === 0 || dow === 6 || isHoliday(d)) {
         row.push({ content: isHoliday(d) ? 'F' : '', styles: { fillColor: [233,238,244], textColor: [170,180,190] } });
       } else {
-        const code = absenceType(p, ds) || 'P';
-        const sty = CODE_STYLE[code] || CODE_STYLE.P;
+        const st = dayCode(p, ds);
+        const sty = CODE_STYLE[st.code] || CODE_STYLE.P;
         const ex = personExtra(p, ds);
-        row.push({ content: ex ? `${code}\n+${ex.hours}h` : code, styles: { fillColor: hexRgb(sty.bg), textColor: hexRgb(sty.fg), fontStyle: 'bold' } });
+        const lbl = cellLabel(st);
+        row.push({ content: ex ? `${lbl}\n+${ex.hours}h` : lbl, styles: { fillColor: hexRgb(sty.bg), textColor: hexRgb(sty.fg), fontStyle: 'bold' } });
       }
     }
     return row;
@@ -560,6 +571,7 @@ function drawPdfLegend(doc, x0, y0, maxRight) {
     const s = CODE_STYLE[code];
     items.push({ box: code, label: POINTAGE_LABELS[code], bg: hexRgb(s.bg), fg: hexRgb(s.fg) });
   }
+  if (mc.hasHalf) items.push({ box: '½', label: 'Demi-journée (0,5 j)', bg: hexRgb(CODE_STYLE.CP.bg), fg: hexRgb(CODE_STYLE.CP.fg) });
   if (mc.hasExtra) items.push({ box: '+h', label: 'Heures supp.', bg: [255,255,255], fg: [180,83,9], border: [252,211,77] });
   items.push({ box: '', label: mc.hasHoliday ? 'Week-end / Férié (F)' : 'Week-end', bg: [233,238,244], fg: [100,116,139], border: [226,232,240], minBoxW: 6 });
 
