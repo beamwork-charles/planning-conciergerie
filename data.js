@@ -145,7 +145,13 @@ const ABSENCES = {
     // Fêtes : off les 22, 23, 24 et 28/12 (4 jours ouvrés). Les 3 derniers RTT 2026 sur 22 → 24/12
     // (13/13 posés, rien de perdu au 31/12), puis 1 CP le 28/12, pris sur la poche N-1.
     '2026-12-22': 'RTT', '2026-12-23': 'RTT', '2026-12-24': 'RTT',
-    '2026-12-28': 'CP'
+    '2026-12-28': 'CP',
+    // Off du lundi 08 au dimanche 21/03/2027 : 10 jours ouvrés (aucun férié). Même règle qu'en 2026 :
+    // RTT à hauteur de ce qui est acquis (15 j en 2027, soit 3,75 fin mars) → 3 RTT les 08-10/03,
+    // puis 7 CP, pris sur la poche N (la N-1 est vide depuis le 28/12).
+    '2027-03-08': 'RTT', '2027-03-09': 'RTT', '2027-03-10': 'RTT',
+    '2027-03-11': 'CP', '2027-03-12': 'CP',
+    '2027-03-15': 'CP', '2027-03-16': 'CP', '2027-03-17': 'CP', '2027-03-18': 'CP', '2027-03-19': 'CP'
   }
 };
 
