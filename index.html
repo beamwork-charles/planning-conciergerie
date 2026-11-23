@@ -525,7 +525,7 @@ function genDay(date) {
 
   const absentToday = new Set();
   for (const p of Object.keys(COLLABORATORS)) if (isAbsent(p, dateStr)) absentToday.add(p);
-  applySubs(schedule, absentToday);
+  applySubs(schedule, absentToday, dateStr);
   applyHalfDays(schedule, dateStr);
   applyOverrides(schedule, dateStr);
   schedule.dynah   = computeStatus('Dynah', schedule, absentToday);
@@ -590,7 +590,7 @@ function applyOverrides(schedule, dateStr) {
   }
 }
 
-function applySubs(schedule, absentToday) {
+function applySubs(schedule, absentToday, dateStr) {
   // Un renfort ne peut couvrir qu'un seul shift par jour → on suit ceux déjà placés
   const usedRenforts = new Set();
   const pickRenfort = () => {
@@ -618,6 +618,7 @@ function applySubs(schedule, absentToday) {
         const s = blk[slot];
         if (absentToday.has(s.person)) {
           s.substituteFor = s.person;
+          s.vacant = !isEmployed(s.person, dateStr);   // départ : « poste vacant » plutôt que « remplace X »
           s.person = pickRenfort();
         }
       }
@@ -753,7 +754,8 @@ function renderBuildingMini(name, blk, dateStr, reducedBadge) {
   return html + `</div>`;
 }
 function renderOffRows(building, dateStr) {
-  const absent = BUILDING_CONCIERGES[building].filter(p => isAbsent(p, dateStr));
+  // Une personne partie n'est pas « OFF » : elle n'apparaît simplement plus.
+  const absent = BUILDING_CONCIERGES[building].filter(p => isEmployed(p, dateStr) && isAbsent(p, dateStr));
   if (!absent.length) return '';
   return absent.map(p => {
     const meta = COLLABORATORS[p];
@@ -766,7 +768,7 @@ function renderShiftBar(shift, label) {
   const colorClass = meta ? `clr-${meta.color}` : 'clr-none';
   // Personne hors équipe (ex. remplaçant·e externe placé·e via OVERRIDES) : on affiche son nom, style neutre.
   const nm = meta ? meta.shortName : (shift.person || '⚠️ Aucun');
-  const sub = (shift.substituteFor ? `<span class="sub-note">remplace ${SN(shift.substituteFor)}</span>` : '')
+  const sub = (shift.substituteFor ? `<span class="sub-note">${shift.vacant ? 'poste vacant' : 'remplace ' + SN(shift.substituteFor)}</span>` : '')
             + (shift.halfOff ? `<span class="sub-note">½ journée ${shift.halfOff}</span>` : '');
   return `<div class="shift-bar ${colorClass} ${shift.substituteFor ? 'is-sub' : ''} ${!shift.person ? 'is-none' : ''}">
       <span class="when">${label}</span><span class="name-wrap"><span class="name">${nm}</span>${sub}</span></div>`;
@@ -809,7 +811,7 @@ function openLeaveModal(preset) {
       <div>
         <label class="lbl">Qui fait la demande&nbsp;?</label>
         <select id="leave-person" class="leave-input">
-          ${Object.keys(COLLABORATORS).map(p => `<option value="${p}" ${p === preset ? 'selected' : ''}>${COLLABORATORS[p].shortName}${COLLABORATORS[p].building ? ' — ' + COLLABORATORS[p].building : ' — Renfort'}</option>`).join('')}
+          ${Object.keys(COLLABORATORS).filter(p => isEmployed(p, todayStr)).map(p => `<option value="${p}" ${p === preset ? 'selected' : ''}>${COLLABORATORS[p].shortName}${COLLABORATORS[p].building ? ' — ' + COLLABORATORS[p].building : ' — Renfort'}</option>`).join('')}
         </select>
       </div>
       <div>
@@ -924,8 +926,9 @@ function leaveTight(requester, dates) {
   }
   return out;
 }
-function joinNames(arr) {
-  const names = arr.map(SN);
+// date (facultative) : une personne partie à cette date est nommée « Flora (poste vacant) »
+function joinNames(arr, date) {
+  const names = arr.map(p => (date && !isEmployed(p, date)) ? `${SN(p)} (poste vacant)` : SN(p));
   if (names.length <= 1) return names.join('');
   return names.slice(0, -1).join(', ') + ' & ' + names[names.length - 1];
 }
@@ -934,9 +937,9 @@ function tightReason(c, requester) {
   if (c.absentConcierges.length) {
     if (reqIsRenf) {
       const otherRenf = requester === 'Dynah' ? 'Charles' : 'Dynah';
-      return `${joinNames(c.absentConcierges)} déjà absent·e — ${otherRenf} restera seul·e pour assurer le remplacement, aucune réserve en cas d'imprévu`;
+      return `${joinNames(c.absentConcierges, c.date)} déjà absent·e — ${otherRenf} restera seul·e pour assurer le remplacement, aucune réserve en cas d'imprévu`;
     }
-    return `${joinNames(c.absentConcierges)} déjà absent·e — les 2 renforts (Dynah & Charles) seront mobilisés`;
+    return `${joinNames(c.absentConcierges, c.date)} déjà absent·e — les 2 renforts (Dynah & Charles) seront mobilisés`;
   }
   if (c.absentRenforts.length) {
     const otherRenf = c.absentRenforts.includes('Dynah') ? 'Charles' : 'Dynah';
@@ -952,12 +955,12 @@ function blockerReason(b, requester) {
   if (renf.length === 1 && conc.length >= 1) {
     const otherRenf = renf[0] === 'Dynah' ? 'Charles' : 'Dynah';
     if (requester === otherRenf) {
-      return `${SN(renf[0])} (renfort) et ${joinNames(conc)} déjà absent·e·s — vous êtes le dernier renfort disponible pour assurer le remplacement`;
+      return `${SN(renf[0])} (renfort) et ${joinNames(conc, b.date)} déjà absent·e·s — vous êtes le dernier renfort disponible pour assurer le remplacement`;
     }
-    return `${SN(renf[0])} (renfort) et ${joinNames(conc)} déjà absent·e·s — ${otherRenf} est déjà mobilisé·e pour le remplacement`;
+    return `${SN(renf[0])} (renfort) et ${joinNames(conc, b.date)} déjà absent·e·s — ${otherRenf} est déjà mobilisé·e pour le remplacement`;
   }
   const all = [...renf, ...conc];
-  return `${joinNames(all)} déjà absent·e·s — plus assez de renforts pour vous remplacer`;
+  return `${joinNames(all, b.date)} déjà absent·e·s — plus assez de renforts pour vous remplacer`;
 }
 // Vrai si au moins un JOUR OUVRÉ demandé est à moins de 7 jours d'aujourd'hui
 // (demander un week-end/férié ne déclenche pas l'alerte : rien n'est décompté ces jours-là)
@@ -1103,14 +1106,14 @@ document.getElementById('period-label').addEventListener('click', goToToday);
 
 // ----- UX : légende dépliable -----
 function buildLegend() {
-  const people = Object.keys(COLLABORATORS).map(p => {
+  const people = Object.keys(COLLABORATORS).filter(p => isEmployed(p, todayStr)).map(p => {
     const m = COLLABORATORS[p];
     return `<div class="legend-row"><span class="legend-dot" style="background:${COLOR_HEX[m.color]}"></span>${m.shortName} — ${m.building || 'Renfort'}</div>`;
   }).join('');
   return `
     <div class="legend-title">Équipe</div>${people}
     <div class="legend-title">Lecture du planning</div>
-    <div class="legend-row"><span>⚡</span><span>Remplacement — « remplace X » sous le nom</span></div>
+    <div class="legend-row"><span>⚡</span><span>Remplacement — « remplace X » sous le nom (« poste vacant » après un départ)</span></div>
     <div class="legend-row"><span class="legend-dot" style="background:#f59e0b"></span><span>Pastille 9h–17h : horaires réduits</span></div>
     <div class="legend-row"><span style="text-decoration:line-through;color:#64748b;font-weight:700">Nom</span><span>+ OFF : absent ce jour-là</span></div>
     <div class="legend-row"><span>⏱</span><span>Heures supplémentaires</span></div>

@@ -38,9 +38,14 @@ function setupGate() {
 
 // ===== Collaborateurs =====
 // rtt: true => ce collaborateur peut cumuler des RTT (Charles uniquement)
+// end: 'AAAA-MM-JJ' => DERNIER JOUR TRAVAILLÉ (fin de contrat). Ensuite la personne sort du planning
+//   (ses shifts passent aux renforts, affichés « poste vacant »), du pointage RH et des alertes, et ses
+//   CP cessent de s'acquérir (mois du départ au prorata). Son solde au départ est payé au solde de
+//   tout compte. L'historique d'avant reste affiché tel quel.
 const COLLABORATORS = {
   Emilie:  { building: 'TB3', color: 'emilie',  role: 'concierge', shortName: 'Émilie' },
-  Flora:   { building: 'TB3', color: 'flora',   role: 'concierge', shortName: 'Flora' },
+  // Fin de contrat : dernier jour travaillé chez The Bureau le mercredi 16/12/2026.
+  Flora:   { building: 'TB3', color: 'flora',   role: 'concierge', shortName: 'Flora', end: '2026-12-16' },
   Cédric:  { building: 'TB4', color: 'cedric',  role: 'concierge', shortName: 'Cédric' },
   Chiara:  { building: 'TB4', color: 'chiara',  role: 'concierge', shortName: 'Chiara' },
   Dynah:   { building: null,  color: 'dynah',   role: 'renfort',   shortName: 'Dynah' },
@@ -92,10 +97,8 @@ const ABSENCES = {
   Flora:   {
     '2026-08-10': 'CP', '2026-08-11': 'CP', '2026-08-12': 'CP', '2026-08-13': 'CP', '2026-08-14': 'CP',
     // CP 22 → 23/10 (2 jours ouvrés, jeudi et vendredi). Elle travaille bien les 20 et 21/10.
-    '2026-10-22': 'CP', '2026-10-23': 'CP',
-    // CP lundi 28 et mardi 29/12 (2 jours ouvrés). Période des fêtes en horaires réduits :
-    // Émilie assure seule TB3 en 9h-17h, sans renfort (règle du mode réduit).
-    '2026-12-28': 'CP', '2026-12-29': 'CP'
+    // (Ses CP des 28 et 29/12 sont retirés : son contrat s'arrête le 16/12, voir COLLABORATORS.)
+    '2026-10-22': 'CP', '2026-10-23': 'CP'
   },
   Chiara:  {
     '2026-07-24': 'CP', '2026-09-07': 'CP', '2026-09-08': 'CP', '2026-09-09': 'CP', '2026-09-10': 'CP', '2026-09-11': 'CP',
@@ -142,13 +145,12 @@ const ABSENCES = {
     '2026-09-21': 'CSUP', '2026-09-22': 'CSUP', '2026-09-23': 'CSUP', '2026-09-24': 'CSUP', '2026-09-25': 'CSUP',
     // 28/09 → 02/10 : RTT (10 RTT posés à ce stade, il en restait 3 à placer avant le 31/12).
     '2026-09-28': 'RTT', '2026-09-29': 'RTT', '2026-09-30': 'RTT', '2026-10-01': 'RTT', '2026-10-02': 'RTT',
-    // Fêtes : off les 22, 23, 24 et 28/12 (4 jours ouvrés). Les 3 derniers RTT 2026 sur 22 → 24/12
-    // (13/13 posés, rien de perdu au 31/12), puis 1 CP le 28/12, pris sur la poche N-1.
-    '2026-12-22': 'RTT', '2026-12-23': 'RTT', '2026-12-24': 'RTT',
-    '2026-12-28': 'CP',
+    // Fêtes : off les 23, 24 et 28/12 (3 jours ouvrés ; il travaille finalement le 22/12).
+    // Les 3 derniers RTT 2026 : 13/13 posés, rien de perdu au 31/12, aucun CP consommé.
+    '2026-12-23': 'RTT', '2026-12-24': 'RTT', '2026-12-28': 'RTT',
     // Off du lundi 08 au dimanche 21/03/2027 : 10 jours ouvrés (aucun férié). Même règle qu'en 2026 :
     // RTT à hauteur de ce qui est acquis (15 j en 2027, soit 3,75 fin mars) → 3 RTT les 08-10/03,
-    // puis 7 CP, pris sur la poche N (la N-1 est vide depuis le 28/12).
+    // puis 7 CP : le 1er solde sa poche N-1 (1 j, expire au 31/05/2027), les 6 autres sur la poche N.
     '2027-03-08': 'RTT', '2027-03-09': 'RTT', '2027-03-10': 'RTT',
     '2027-03-11': 'CP', '2027-03-12': 'CP',
     '2027-03-15': 'CP', '2027-03-16': 'CP', '2027-03-17': 'CP', '2027-03-18': 'CP', '2027-03-19': 'CP'
@@ -446,9 +448,15 @@ function absenceEntry(person, dateStr) {
 }
 function absenceType(person, dateStr) { return absenceEntry(person, dateStr)?.type || null; }
 function halfDayOff(person, dateStr) { return absenceEntry(person, dateStr)?.half || null; }
+// Sous contrat ce jour-là ? (faux après COLLABORATORS[p].end, le dernier jour travaillé)
+function isEmployed(person, dateStr) { const end = COLLABORATORS[person]?.end; return !end || dateStr <= end; }
 // Absent TOUTE la journée. Une demi-journée ne retire pas la personne du planning : elle garde
-// son shift, réduit de moitié (voir applyHalfDays dans index.html).
-function isAbsent(person, dateStr) { const e = absenceEntry(person, dateStr); return !!e && !e.half; }
+// son shift, réduit de moitié (voir applyHalfDays dans index.html). Après un départ, la personne
+// est absente tous les jours : ses shifts passent aux renforts comme pour un congé.
+function isAbsent(person, dateStr) {
+  if (!isEmployed(person, dateStr)) return true;
+  const e = absenceEntry(person, dateStr); return !!e && !e.half;
+}
 // Moitié travaillée d'un shift quand l'autre est posée : 8h-16h → 8h-12h (aprem posée) ou 12h-16h.
 function halfShiftTime(time, half) {
   const m = /^(\d+)h-(\d+)h$/.exec(time || '');

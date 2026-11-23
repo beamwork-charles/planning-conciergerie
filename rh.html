@@ -204,11 +204,15 @@ function atMin() { return false; }
 
 const PEOPLE = Object.keys(COLLABORATORS);
 const WD_INITIAL = ['D','L','M','M','J','V','S'];
+// Lignes du pointage d'un mois : les personnes sous contrat au 1er du mois. Après un départ, le mois
+// du départ reste affiché (solde final compris), la personne disparaît à partir du mois suivant.
+function peopleInMonth(y, m) { const first = fmt(new Date(y, m, 1)); return PEOPLE.filter(p => isEmployed(p, first)); }
 
 // ----- Statut d'un jour -----
 function dayCode(person, dateStr) {
   const d = parseD(dateStr);
   const dow = d.getDay();
+  if (!isEmployed(person, dateStr)) return { off: 'out', label: `Hors contrat (dernier jour travaillé le ${fmtFR(COLLABORATORS[person].end)})` };
   if (dow === 0 || dow === 6) return { off: 'we' };
   if (isHoliday(d)) return { off: 'hol', label: isHoliday(d) };
   const e = absenceEntry(person, dateStr);
@@ -257,7 +261,7 @@ function cpToPlan(person, y, m) {
   const endY = m >= 5 ? y + 1 : y;                       // année du 31/05 qui clôt la période en cours
   const atEnd  = cpPots(person, endY, 4);                // tous les CP saisis jusqu'à ce 31/05 déduits
   const atNext = cpPots(person, endY + 1, 4);            // la poche N actuelle expire au 31/05 suivant
-  const stillToAccrue = CP_PER_MONTH * (mIdx(endY, 4) - mIdx(y, m));   // pas encore acquis d'ici là
+  const stillToAccrue = CP_PER_MONTH * accrualMonths(person, mIdx(y, m) + 1, mIdx(endY, 4));   // pas encore acquis d'ici là
   return { n1: atEnd.n1, n: atNext.n1 - stillToAccrue };
 }
 
@@ -267,17 +271,20 @@ function renderExpiryAlerts() {
 
   // CP — seule la poche N-1 expire au 31/05 de la période en cours. La poche N a un an de plus :
   // alarmer sur le solde total surestimait massivement l'urgence (158 j affichés contre 16,5 réels).
+  // Une personne qui part (COLLABORATORS[p].end) n'a plus rien « à poser » : son solde au départ est
+  // payé au solde de tout compte.
+  const staying = PEOPLE.filter(p => !COLLABORATORS[p].end);
   const endY = tm >= 5 ? ty + 1 : ty;
-  const toPlan = Object.fromEntries(PEOPLE.map(p => [p, cpToPlan(p, ty, tm)]));
-  const cpN1 = PEOPLE.map(p => ({ p, solde: toPlan[p].n1 }))
+  const toPlan = Object.fromEntries(staying.map(p => [p, cpToPlan(p, ty, tm)]));
+  const cpN1 = staying.map(p => ({ p, solde: toPlan[p].n1 }))
     .filter(x => x.solde > 0.01).sort((a, b) => b.solde - a.solde);
   if (cpN1.length) groups.push({ type: 'CP N-1', deadline: new Date(endY, 4, 31), people: cpN1 });
-  const cpN = PEOPLE.map(p => ({ p, solde: toPlan[p].n }))
+  const cpN = staying.map(p => ({ p, solde: toPlan[p].n }))
     .filter(x => x.solde > 0.01).sort((a, b) => b.solde - a.solde);
   if (cpN.length) groups.push({ type: 'CP N', deadline: new Date(endY + 1, 4, 31), people: cpN });
 
   // RTT — échéance 31 décembre (cadres au forfait : Charles). Acquis à ce jour − RTT saisis sur toute l'année.
-  const rttPeople = PEOPLE.filter(p => COLLABORATORS[p].rtt)
+  const rttPeople = staying.filter(p => COLLABORATORS[p].rtt)
     .map(p => ({ p, solde: rttAcquired(p, ty, tm) - rttTakenInYear(p, ty, 11) }))
     .filter(x => x.solde > 0.01).sort((a, b) => b.solde - a.solde);
   if (rttPeople.length) groups.push({ type: 'RTT', deadline: nextOccurrence(11, 31), people: rttPeople });
@@ -318,7 +325,7 @@ function renderTable() {
 
   // Corps
   let body = '<tbody>';
-  for (const p of PEOPLE) {
+  for (const p of peopleInMonth(currentYear, currentMonth)) {
     const c = COLOR_HEX[COLLABORATORS[p].color];
     body += `<tr><td class="name" style="--c:${c}">${COLLABORATORS[p].shortName}</td>`;
     for (let i = 1; i <= nbDays; i++) {
@@ -354,6 +361,19 @@ const ACCRUAL_IDX = mIdx(ACCRUAL_START.y, ACCRUAL_START.m);   // démarrage du s
 // --- CP : période de référence 1er juin → 31 mai, remise à zéro chaque 31 mai (non pris = perdus) ---
 // Début (juin) de la période de référence contenant (y,m).
 function cpRefStart(y, m) { return mIdx((m >= 5) ? y : y - 1, 5); }  // juin..déc → année y ; janv..mai → y-1
+// Nombre de mois d'acquisition CP dans [startIdx, endIdx] inclus. Après un départ (COLLABORATORS[p].end),
+// plus rien ne s'acquiert ; le mois du départ compte au prorata des jours calendaires (16/12 → 16/31).
+// C'est une estimation : le solde de tout compte établi par la paie fait foi.
+function accrualMonths(person, startIdx, endIdx) {
+  if (endIdx < startIdx) return 0;
+  const end = COLLABORATORS[person]?.end;
+  if (!end) return endIdx - startIdx + 1;
+  const e = parseD(end), eIdx = mIdx(e.getFullYear(), e.getMonth());
+  if (startIdx > eIdx) return 0;
+  if (endIdx < eIdx) return endIdx - startIdx + 1;
+  const daysInMonth = new Date(e.getFullYear(), e.getMonth() + 1, 0).getDate();
+  return (eIdx - startIdx) + e.getDate() / daysInMonth;
+}
 // CP acquis à fin du mois affiché, DANS la période de référence courante.
 // Le report d'ouverture (solde au 31/05/2026) n'est appliqué qu'à la 1re période (démarrant en juin 2026).
 function cpAcquired(person, y, m) {
@@ -361,7 +381,7 @@ function cpAcquired(person, y, m) {
   const op = (OPENING_BALANCE[person] && OPENING_BALANCE[person].cp) || 0;
   if (viewIdx < ACCRUAL_IDX) return op;                        // avant juin 2026 : on montre le report
   const startIdx = Math.max(cpRefStart(y, m), ACCRUAL_IDX);
-  const months = Math.max(0, viewIdx - startIdx + 1);
+  const months = accrualMonths(person, startIdx, viewIdx);
   const seed = (cpRefStart(y, m) <= ACCRUAL_IDX) ? op : 0;     // report seedé sur la 1re période uniquement
   return seed + CP_PER_MONTH * months;
 }
@@ -405,7 +425,7 @@ function cpPots(person, y, m) {
   if (viewIdx < start) return { n1, n: 0, total: n1 };
   for (;;) {
     const end = Math.min(viewIdx, start + 11);
-    n = CP_PER_MONTH * (end - start + 1);
+    n = CP_PER_MONTH * accrualMonths(person, start, end);
     const taken = countTypeBetween(person, 'CP', start, end);
     const fromN1 = Math.min(n1, taken);
     n1 -= fromN1;
@@ -430,14 +450,17 @@ function renderCounters() {
     + '<th>CP acquis</th><th>CP pris</th><th>CP solde</th><th>dont expire<br>au 31/05</th>'
     + '<th>RTT acquis</th><th>RTT pris</th><th>RTT solde</th>'
     + '<th>H. supp mois</th></tr></thead><tbody>';
-  for (const p of PEOPLE) {
+  for (const p of peopleInMonth(currentYear, currentMonth)) {
     const c = COLOR_HEX[COLLABORATORS[p].color];
     const canRtt = !!COLLABORATORS[p].rtt;
     const cpAcq = cpAcquired(p, currentYear, currentMonth);
     const cpTaken = cpTakenInRef(p, currentYear, currentMonth);
     const cpSolde = cpAcq - cpTaken;
     const ot = sumExtra(p, currentMonth);
-    html += `<tr><td class="name" style="--c:${c}">${COLLABORATORS[p].shortName}</td>`;
+    // Mois du départ : le solde affiché est celui payé au solde de tout compte
+    const leaving = departureLabel(p, currentYear, currentMonth);
+    const tag = leaving ? `<div class="text-[9px] font-semibold text-slate-400 leading-tight">${leaving}</div>` : '';
+    html += `<tr><td class="name" style="--c:${c}">${COLLABORATORS[p].shortName}${tag}</td>`;
     html += `<td class="num">${fmtNum(cpAcq)}</td><td class="num">${fmtNum(cpTaken)}</td>`;
     html += `<td class="num" style="color:${cpSolde < 0 ? '#dc2626' : '#166534'}">${fmtNum(cpSolde)}</td>`;
     const n1 = cpPots(p, currentYear, currentMonth).n1;
@@ -457,27 +480,40 @@ function renderCounters() {
   document.getElementById('counters-table').innerHTML = html;
 }
 
-// Recense ce qui figure réellement sur le mois affiché (codes, heures supp, férié)
+// « départ le 16/12 » si la personne quitte l'entreprise pendant le mois (y, m), sinon ''
+function departureLabel(person, y, m) {
+  const end = COLLABORATORS[person]?.end;
+  if (!end) return '';
+  const e = parseD(end);
+  return (e.getFullYear() === y && e.getMonth() === m) ? `départ le ${pad(e.getDate())}/${pad(e.getMonth() + 1)}` : '';
+}
+
+// Recense ce qui figure réellement sur le mois affiché (codes, heures supp, férié, hors contrat)
 function monthContents() {
   const codes = new Set();
-  let hasExtra = false, hasHoliday = false, hasHalf = false;
+  let hasExtra = false, hasHoliday = false, hasHalf = false, hasOut = false;
   const nbDays = new Date(currentYear, currentMonth + 1, 0).getDate();
+  const people = peopleInMonth(currentYear, currentMonth);
   for (let i = 1; i <= nbDays; i++) {
     const d = new Date(currentYear, currentMonth, i);
     const ds = fmt(d);
     if (isHoliday(d)) hasHoliday = true;
-    for (const p of PEOPLE) {
+    for (const p of people) {
       const st = dayCode(p, ds);
       if (st.code) codes.add(st.code);
       if (st.half) hasHalf = true;
+      if (st.off === 'out') hasOut = true;
       if (personExtra(p, ds)) hasExtra = true;
     }
   }
-  return { codes, hasExtra, hasHoliday, hasHalf };
+  return { codes, hasExtra, hasHoliday, hasHalf, hasOut };
 }
+// Libellé de la case grisée de légende
+function greyLabel(mc) { return (mc.hasHoliday ? 'Week-end / Férié (F)' : 'Week-end') + (mc.hasOut ? ' / Hors contrat' : ''); }
 // Légende : n'affiche que les pointages présents sur le mois affiché
 function renderLegend() {
-  const { codes, hasExtra, hasHoliday, hasHalf } = monthContents();
+  const mc = monthContents();
+  const { codes, hasExtra, hasHalf } = mc;
   let html = '';
   for (const code of CODE_ORDER) {
     if (!codes.has(code)) continue;
@@ -486,7 +522,7 @@ function renderLegend() {
   }
   if (hasHalf) html += `<span class="legend-chip"><span class="legend-box" style="background:linear-gradient(135deg, ${CODE_STYLE.P.bg} 50%, ${CODE_STYLE.CP.bg} 50%);color:${CODE_STYLE.CP.fg}">½</span>Demi-journée (0,5 j)</span>`;
   if (hasExtra) html += `<span class="legend-chip"><span class="legend-box" style="background:#fff;color:#b45309;border-color:#fcd34d">+h</span>Heures supp.</span>`;
-  html += `<span class="legend-chip"><span class="legend-box" style="background:repeating-linear-gradient(135deg,#f1f5f9 0 4px,#e9eef4 4px 8px)"></span>${hasHoliday ? 'Week-end / Férié (F)' : 'Week-end'}</span>`;
+  html += `<span class="legend-chip"><span class="legend-box" style="background:repeating-linear-gradient(135deg,#f1f5f9 0 4px,#e9eef4 4px 8px)"></span>${greyLabel(mc)}</span>`;
   document.getElementById('legend').innerHTML = html;
 }
 
@@ -507,14 +543,15 @@ function downloadPDF() {
   const nbDays = new Date(currentYear, currentMonth + 1, 0).getDate();
   const head = [['Collaborateur']];
   for (let i = 1; i <= nbDays; i++) { const d = new Date(currentYear, currentMonth, i); head[0].push(`${WD_INITIAL[d.getDay()]}\n${i}`); }
-  const body = PEOPLE.map(p => {
+  const people = peopleInMonth(currentYear, currentMonth);
+  const body = people.map(p => {
     const row = [{ content: COLLABORATORS[p].shortName, styles: { halign: 'left', fontStyle: 'bold' } }];
     for (let i = 1; i <= nbDays; i++) {
-      const d = new Date(currentYear, currentMonth, i), ds = fmt(d), dow = d.getDay();
-      if (dow === 0 || dow === 6 || isHoliday(d)) {
-        row.push({ content: isHoliday(d) ? 'F' : '', styles: { fillColor: [233,238,244], textColor: [170,180,190] } });
+      const d = new Date(currentYear, currentMonth, i), ds = fmt(d);
+      const st = dayCode(p, ds);
+      if (st.off) {   // week-end, férié ou hors contrat
+        row.push({ content: st.off === 'hol' ? 'F' : '', styles: { fillColor: [233,238,244], textColor: [170,180,190] } });
       } else {
-        const st = dayCode(p, ds);
         const sty = CODE_STYLE[st.code] || CODE_STYLE.P;
         const ex = personExtra(p, ds);
         const lbl = cellLabel(st);
@@ -532,16 +569,18 @@ function downloadPDF() {
   });
 
   // Compteurs
-  const cHead = [['Collaborateur','CP acquis','CP pris','CP solde','RTT acquis','RTT pris','RTT solde','H. supp mois']];
+  // 9 colonnes, comme le tableau à l'écran (la colonne « dont expire » manquait : les en-têtes RTT étaient décalés)
+  const cHead = [['Collaborateur','CP acquis','CP pris','CP solde','dont expire au 31/05','RTT acquis','RTT pris','RTT solde','H. supp mois']];
   const grey = { fillColor: [241,245,249], textColor: [170,180,190] };
-  const cBody = PEOPLE.map(p => {
+  const cBody = people.map(p => {
     const canRtt = !!COLLABORATORS[p].rtt;
     const cpAcq = cpAcquired(p, currentYear, currentMonth);
     const cpTaken = cpTakenInRef(p, currentYear, currentMonth);
     const cpSolde = cpAcq - cpTaken;
     const ot = sumExtra(p, currentMonth);
+    const leaving = departureLabel(p, currentYear, currentMonth);
     const row = [
-      { content: COLLABORATORS[p].shortName, styles: { halign: 'left', fontStyle: 'bold' } },
+      { content: COLLABORATORS[p].shortName + (leaving ? ` (${leaving})` : ''), styles: { halign: 'left', fontStyle: 'bold' } },
       fmtNum(cpAcq), fmtNum(cpTaken),
       { content: fmtNum(cpSolde), styles: { fontStyle: 'bold', textColor: cpSolde < 0 ? [220,38,38] : [22,101,52] } },
     ];
@@ -586,7 +625,7 @@ function drawPdfLegend(doc, x0, y0, maxRight) {
   }
   if (mc.hasHalf) items.push({ box: '½', label: 'Demi-journée (0,5 j)', bg: hexRgb(CODE_STYLE.CP.bg), fg: hexRgb(CODE_STYLE.CP.fg) });
   if (mc.hasExtra) items.push({ box: '+h', label: 'Heures supp.', bg: [255,255,255], fg: [180,83,9], border: [252,211,77] });
-  items.push({ box: '', label: mc.hasHoliday ? 'Week-end / Férié (F)' : 'Week-end', bg: [233,238,244], fg: [100,116,139], border: [226,232,240], minBoxW: 6 });
+  items.push({ box: '', label: greyLabel(mc), bg: [233,238,244], fg: [100,116,139], border: [226,232,240], minBoxW: 6 });
 
   const boxH = 4.2, padX = 1.4, gap = 1.6, chipGap = 5, lineH = 6;
   let x = x0, y = y0;
