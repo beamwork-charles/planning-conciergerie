@@ -44,8 +44,8 @@ function setupGate() {
 //   tout compte. L'historique d'avant reste affiché tel quel.
 const COLLABORATORS = {
   Emilie:  { building: 'TB3', color: 'emilie',  role: 'concierge', shortName: 'Émilie' },
-  // Fin de contrat : dernier jour travaillé chez The Bureau le mercredi 16/12/2026.
-  Flora:   { building: 'TB3', color: 'flora',   role: 'concierge', shortName: 'Flora', end: '2026-12-16' },
+  // Fin de contrat : dernier jour travaillé chez The Bureau le lundi 16/11/2026 (voir DAY_MESSAGES).
+  Flora:   { building: 'TB3', color: 'flora',   role: 'concierge', shortName: 'Flora', end: '2026-11-16' },
   Cédric:  { building: 'TB4', color: 'cedric',  role: 'concierge', shortName: 'Cédric' },
   Chiara:  { building: 'TB4', color: 'chiara',  role: 'concierge', shortName: 'Chiara' },
   Dynah:   { building: null,  color: 'dynah',   role: 'renfort',   shortName: 'Dynah' },
@@ -97,7 +97,7 @@ const ABSENCES = {
   Flora:   {
     '2026-08-10': 'CP', '2026-08-11': 'CP', '2026-08-12': 'CP', '2026-08-13': 'CP', '2026-08-14': 'CP',
     // CP 22 → 23/10 (2 jours ouvrés, jeudi et vendredi). Elle travaille bien les 20 et 21/10.
-    // (Ses CP des 28 et 29/12 sont retirés : son contrat s'arrête le 16/12, voir COLLABORATORS.)
+    // (Ses CP des 28 et 29/12 sont retirés : son contrat s'est arrêté le 16/11, voir COLLABORATORS.)
     '2026-10-22': 'CP', '2026-10-23': 'CP'
   },
   Chiara:  {
@@ -107,7 +107,8 @@ const ABSENCES = {
     '2026-09-14': 'AM', '2026-09-15': 'AM', '2026-09-16': 'AM',
     // 17, 18 et 25/11 : 2 jours ouvrés de CP au total (deux demi-journées + une journée entière).
     // 17/11 : Chiara est du matin → elle fait 8h-12h, Cédric (11h-19h) couvre l'après-midi.
-    // 18/11 : journée entière, Dynah prend son shift du matin (remplacement automatique).
+    // 18/11 : journée entière, Charles prend son shift du matin (remplacement automatique : Dynah tient
+    // déjà le poste de Flora, partie le 16/11).
     // 25/11 : Chiara est du soir → elle fait 15h-19h, Cédric (8h-16h) couvre le matin.
     '2026-11-17': { type: 'CP', half: 'aprem' }, '2026-11-18': 'CP', '2026-11-25': { type: 'CP', half: 'matin' },
     // CP jeudi 31/12 (1 jour ouvré). Horaires réduits ce jour-là : Cédric assure seul TB4 en 9h-17h.
@@ -130,8 +131,8 @@ const ABSENCES = {
     '2026-09-09': 'CP', '2026-09-10': 'CP', '2026-09-11': 'CP',
     '2026-09-21': 'CP',
     '2026-10-13': 'CP',
-    // CP jeudi 19 et vendredi 20/11 (2 jours ouvrés). Aucun remplacement : les quatre concierges
-    // sont présents, Charles reste seul renfort ces deux jours.
+    // CP jeudi 19 et vendredi 20/11 (2 jours ouvrés). Flora étant partie le 16/11, c'est Charles qui
+    // tient son poste ces deux jours.
     '2026-11-19': 'CP', '2026-11-20': 'CP'
   },
   Charles: {
@@ -210,6 +211,12 @@ const EXTRA_HOURS = {
   // Cédric finit à 16h au lieu de 19h : 3 h dues, à rattraper. Quand il les aura faites,
   // ajouter une entrée positive à la date du rattrapage pour solder le compteur.
   '2026-09-25': [ { person: 'Cédric', label: 'fin à 16h au lieu de 19h', hours: -3 } ]
+};
+
+// Petits messages affichés en haut d'une case du planning : { 'AAAA-MM-JJ': { text, person } }.
+// person (facultatif) donne la couleur du message.
+const DAY_MESSAGES = {
+  '2026-11-16': { text: 'Bonne continuation Flora ! 👋', person: 'Flora' }   // son dernier jour travaillé
 };
 
 // Arrangements durables entre binômes, par jour de la semaine — écrasent l'alternance de parité

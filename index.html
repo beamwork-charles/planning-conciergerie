@@ -78,6 +78,11 @@
   .day-head { display: flex; align-items: center; justify-content: space-between; gap: 4px; }
   .day-name { display: none; font-weight: 600; color: #64748b; text-transform: capitalize; }
   .day-buildings { display: flex; flex-direction: column; gap: 9px; }
+  .day-msg {
+    margin: 6px 0 7px; padding: 4px 8px; border-radius: 8px; text-align: center;
+    font-size: 10.5px; font-weight: 800; line-height: 1.25;
+    background: var(--c); color: #fff;   /* plein : reste lisible une fois la journée passée (case grisée) */
+  }
   .bld-card { display: flex; flex-direction: column; gap: 4px; border: 1px solid #e2e8f0; border-radius: 12px; padding: 7px 7px 8px; }
   .bld-card.tb3 { background: rgba(238,242,255,0.8); border-color: #c7d2fe; }
   .bld-card.tb4 { background: rgba(240,253,250,0.85); border-color: #99f6e4; }
@@ -721,6 +726,9 @@ function renderDayCell(date, isCurrent, isToday) {
   if (sch.reduced && !sch.isWeekend && !sch.holiday) html += `<span class="pill pill-reduced">9h–17h</span>`;
   if (sch.holiday) html += `<span class="pill pill-holiday">Férié</span>`;
   html += `</div></div>`;
+
+  const msg = DAY_MESSAGES[sch.date];
+  if (msg) html += `<div class="day-msg clr-${COLLABORATORS[msg.person]?.color || 'none'}">${msg.text}</div>`;
 
   if (sch.isWeekend) return html + `<div class="text-[11px] text-slate-400 italic mt-2">Weekend</div></div>`;
   if (sch.holiday)   return html + `<div class="text-[11px] text-red-600 font-semibold mt-1">${sch.holiday}</div></div>`;
