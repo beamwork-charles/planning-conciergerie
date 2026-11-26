@@ -42,29 +42,66 @@ function setupGate() {
 //   (ses shifts passent aux renforts, affichés « poste vacant »), du pointage RH et des alertes, et ses
 //   CP cessent de s'acquérir (mois du départ au prorata). Son solde au départ est payé au solde de
 //   tout compte. L'historique d'avant reste affiché tel quel.
+// Le bâtiment de chaque concierge dépend de la date : voir ORGANISATION ci-dessous.
 const COLLABORATORS = {
-  Emilie:  { building: 'TB3', color: 'emilie',  role: 'concierge', shortName: 'Émilie' },
+  Emilie:  { color: 'emilie',  role: 'concierge', shortName: 'Émilie' },
   // Fin de contrat : dernier jour travaillé chez The Bureau le lundi 16/11/2026 (voir DAY_MESSAGES).
-  Flora:   { building: 'TB3', color: 'flora',   role: 'concierge', shortName: 'Flora', end: '2026-11-16' },
-  Cédric:  { building: 'TB4', color: 'cedric',  role: 'concierge', shortName: 'Cédric' },
-  Chiara:  { building: 'TB4', color: 'chiara',  role: 'concierge', shortName: 'Chiara' },
-  Dynah:   { building: null,  color: 'dynah',   role: 'renfort',   shortName: 'Dynah' },
-  Charles: { building: null,  color: 'charles', role: 'renfort',   shortName: 'Charles', rtt: true },
+  Flora:   { color: 'flora',   role: 'concierge', shortName: 'Flora', end: '2026-11-16' },
+  Cédric:  { color: 'cedric',  role: 'concierge', shortName: 'Cédric' },
+  Chiara:  { color: 'chiara',  role: 'concierge', shortName: 'Chiara' },
+  Dynah:   { color: 'dynah',   role: 'renfort',   shortName: 'Dynah' },
+  Charles: { color: 'charles', role: 'renfort',   shortName: 'Charles', rtt: true },
 };
-const PARTNER = { Emilie: 'Flora', Flora: 'Emilie', Cédric: 'Chiara', Chiara: 'Cédric' };
-const BUILDING_CONCIERGES = { TB3: ['Emilie', 'Flora'], TB4: ['Cédric', 'Chiara'] };
 const COLOR_HEX = {
   emilie: '#ec4899', flora: '#a855f7', chiara: '#14b8a6',
   cedric: '#3b82f6', dynah: '#f59e0b', charles: '#10b981', none: '#94a3b8'
 };
 
+// ===== Organisation des bâtiments (change dans le temps) =====
+// Chaque entrée vaut à partir de `since` jusqu'à l'entrée suivante. Par bâtiment :
+//   concierges : rattachés au bâtiment. À deux, ils alternent matin/soir chaque semaine : en semaine de
+//                parité 0, concierges[0] fait le matin et concierges[1] le soir ; l'inverse en parité 1.
+//                Seul, le concierge fait un créneau unique.
+//   shifts     : horaires un jour normal, [matin, soir] à deux, [créneau] seul. Ils fixent aussi
+//                l'amplitude d'ouverture contrôlée par le « ! » (début du 1er → fin du dernier).
+// En horaires réduits (REDUCED_PERIODS, ponts…), tous les concierges du bâtiment font 9h-17h ensemble.
+const ORGANISATION = [
+  { since: '2026-06-01',
+    TB3: { concierges: ['Flora', 'Emilie'], shifts: ['8h-16h', '11h-19h'] },
+    TB4: { concierges: ['Cédric', 'Chiara'], shifts: ['8h-16h', '11h-19h'] } },
+  // 01/01/2027 : TB3 ouvert 8h30-18h avec Émilie et Cédric (Cédric quitte TB4), TB4 ouvert 9h-17h avec
+  // Chiara seule. Émilie et Cédric gardent chacun leur rythme matin/soir de 2026, qui s'emboîtent.
+  // Shifts TB3 de 8 h comme avant, calés sur l'ouverture et la fermeture : 8h30-16h30 et 10h-18h.
+  { since: '2027-01-01',
+    TB3: { concierges: ['Cédric', 'Emilie'], shifts: ['8h30-16h30', '10h-18h'] },
+    TB4: { concierges: ['Chiara'], shifts: ['9h-17h'] } },
+];
+function orgFor(dateStr) {
+  let cur = ORGANISATION[0];
+  for (const o of ORGANISATION) if (o.since <= dateStr) cur = o;
+  return cur;
+}
+function conciergesOf(building, dateStr) { return orgFor(dateStr)[building].concierges; }
+// Bâtiment d'un concierge à une date (null pour un renfort ou une personne hors organisation)
+function buildingOf(person, dateStr) {
+  const org = orgFor(dateStr);
+  return ['TB3', 'TB4'].find(b => org[b].concierges.includes(person)) || null;
+}
+
 // ===== Calendrier =====
-// Semaine de référence 08-14/06/2026 → Flora & Cédric matin, Émilie & Chiara soir
+// Semaine de référence 08-14/06/2026 = parité 0 (voir ORGANISATION pour qui fait le matin)
 const REF_MONDAY    = new Date(2026, 5, 8);
-// Périodes en horaires réduits (9h-17h)
+// Périodes en horaires réduits (9h-17h, tous les bâtiments). Les ponts le sont aussi, via isBridgeDay.
+// 2027 : vacances scolaires de la zone C (Paris), jours ouvrés seulement. Dates officielles des arrêtés
+// du 22/10/2025 (année 2026-2027) et du 21/07/2026 (année 2027-2028), service-public.gouv.fr.
 const REDUCED_PERIODS = [
   { start: new Date(2026, 7, 1),  end: new Date(2026, 7, 21) },   // été : 3 premières semaines d'août (01 → 21/08/2026)
-  { start: new Date(2026, 11, 21), end: new Date(2027, 0, 1) }    // fêtes : 21/12/2026 → 01/01/2027
+  { start: new Date(2026, 11, 21), end: new Date(2027, 0, 1) },   // fêtes : 21/12/2026 → 01/01/2027 (reprise des cours le 04/01)
+  { start: new Date(2027, 1, 8),  end: new Date(2027, 1, 19) },   // hiver zone C : 06/02 → reprise le 22/02/2027
+  { start: new Date(2027, 3, 5),  end: new Date(2027, 3, 16) },   // printemps zone C : 03/04 → reprise le 19/04/2027
+  { start: new Date(2027, 6, 5),  end: new Date(2027, 8, 1) },    // été : 03/07 → rentrée le jeudi 02/09/2027
+  { start: new Date(2027, 9, 25), end: new Date(2027, 10, 5) },   // Toussaint : 23/10 → reprise le 08/11/2027
+  { start: new Date(2027, 11, 20), end: new Date(2027, 11, 31) }  // Noël : 18/12/2027 → reprise le 03/01/2028
 ];
 const MIN_Y = 2026, MIN_M = 5;                 // juin 2026 = premier mois visible
 
@@ -221,8 +258,9 @@ const DAY_MESSAGES = {
 
 // Arrangements durables entre binômes, par jour de la semaine — écrasent l'alternance de parité
 // (mais restent écrasables par un OVERRIDES ponctuel, appliqué plus tard).
-// Format : { TB3|TB4: { since: 'AAAA-MM-JJ', days: { <0=dim..6=sam>: { morning, evening } } } }
+// Format : { TB3|TB4: { since: 'AAAA-MM-JJ', until?: 'AAAA-MM-JJ', days: { <0=dim..6=sam>: { morning, evening } } } }
 // `since` évite de réécrire l'historique déjà affiché : avant cette date, l'alternance normale s'applique.
+// `until` (inclus) clôt l'arrangement : après, l'alternance normale reprend.
 const FIXED_WEEKDAY_SHIFTS = {
   // TB3 — arrangement Flora / Émilie : Flora a besoin de tous ses jeudis soir, elle prend donc tous les
   // jeudis matin (fin à 16h) ; en contrepartie Émilie prend tous les vendredis matin.
@@ -232,6 +270,9 @@ const FIXED_WEEKDAY_SHIFTS = {
   // concerne les jeudis 24/12 et 31/12/2026). Rien à coder : block() ignore morning/evening en réduit.
   TB3: {
     since: '2026-09-01',   // date de l'accord — l'historique d'avant garde l'alternance normale
+    // Fin avec la nouvelle organisation du 01/01/2027 (Flora est partie le 16/11 ; d'ici là son créneau
+    // du jeudi matin / vendredi soir passe au renfort et Émilie garde ses jeudis soir / vendredis matin).
+    until: '2026-12-31',
     days: {
       4: { morning: 'Flora',  evening: 'Emilie' },   // jeudi
       5: { morning: 'Emilie', evening: 'Flora'  }    // vendredi
@@ -464,12 +505,24 @@ function isAbsent(person, dateStr) {
   if (!isEmployed(person, dateStr)) return true;
   const e = absenceEntry(person, dateStr); return !!e && !e.half;
 }
+// Horaires « 8h-16h » / « 8h30-16h30 » ⇄ heures décimales [8, 16] / [8.5, 16.5]. null si illisible.
+function parseRange(time) {
+  const m = /^(\d+)h(\d{2})?-(\d+)h(\d{2})?$/.exec(time || '');
+  return m ? [+m[1] + (+m[2] || 0) / 60, +m[3] + (+m[4] || 0) / 60] : null;
+}
+function fmtH(h) { const hh = Math.floor(h), mm = Math.round((h - hh) * 60); return `${hh}h${mm ? pad(mm) : ''}`; }
 // Moitié travaillée d'un shift quand l'autre est posée : 8h-16h → 8h-12h (aprem posée) ou 12h-16h.
 function halfShiftTime(time, half) {
-  const m = /^(\d+)h-(\d+)h$/.exec(time || '');
-  if (!m) return time;
-  const a = +m[1], b = +m[2], mid = (a + b) / 2;
-  return half === 'matin' ? `${mid}h-${b}h` : `${a}h-${mid}h`;
+  const r = parseRange(time);
+  if (!r) return time;
+  const [a, b] = r, mid = (a + b) / 2;
+  return half === 'matin' ? `${fmtH(mid)}-${fmtH(b)}` : `${fmtH(a)}-${fmtH(mid)}`;
+}
+// Amplitude d'ouverture d'un bâtiment : 9h-17h en réduit, sinon du début du 1er shift à la fin du dernier.
+function openingRange(building, dateStr, reduced) {
+  if (reduced) return [9, 17];
+  const rs = orgFor(dateStr)[building].shifts.map(parseRange);
+  return [Math.min(...rs.map(r => r[0])), Math.max(...rs.map(r => r[1]))];
 }
 function personExtra(person, dateStr) {
   return (EXTRA_HOURS[dateStr] || []).find(e => e.person === person) || null;

@@ -107,10 +107,12 @@
   }
   .shift-bar .when {
     font-size: 10px; font-weight: 700; text-transform: uppercase;
-    letter-spacing: 0.6px; opacity: 0.85; flex-shrink: 0;
+    letter-spacing: 0.6px; opacity: 0.85;
+    /* Peut passer sur 2 lignes après le tiret (« 8h30- / 16h30 ») plutôt que de rogner le nom */
+    flex-shrink: 1; min-width: 0; line-height: 1.1;
   }
   .shift-bar .name-wrap { margin-left: auto; display: flex; flex-direction: column; align-items: flex-end; line-height: 1.15; text-align: right; }
-  .shift-bar .name { font-weight: 700; font-size: 13px; }
+  .shift-bar .name { font-weight: 700; font-size: 13px; white-space: nowrap; }
   .shift-bar .sub-note { font-size: 9px; font-weight: 600; opacity: 0.9; }
   .shift-bar.is-sub .when::before { content: '⚡'; margin-right: 3px; opacity: 0.95; }
   .shift-bar.is-none { background: repeating-linear-gradient(45deg, #fca5a5 0 8px, #ef4444 8px 16px); }
@@ -499,33 +501,29 @@ function genDay(date) {
   const holiday = isHoliday(date);
   if (isWeekend || holiday) return { date: dateStr, isWeekend, holiday, off: true };
 
-  // Alternance de base (cycle de 2 semaines à partir de REF_MONDAY)
+  // Organisation du jour (voir ORGANISATION) + alternance de base (cycle de 2 semaines depuis REF_MONDAY)
+  const org = orgFor(dateStr);
   const parity = getWeekParity(date);
-  const base = {
-    TB3: parity === 0 ? { morning: 'Flora',  evening: 'Emilie' } : { morning: 'Emilie', evening: 'Flora'  },
-    TB4: parity === 0 ? { morning: 'Cédric', evening: 'Chiara' } : { morning: 'Chiara', evening: 'Cédric' }
-  };
-  // Arrangements durables par jour de semaine (voir FIXED_WEEKDAY_SHIFTS) : écrasent l'alternance
-  for (const b of ['TB3', 'TB4']) {
-    const arr = FIXED_WEEKDAY_SHIFTS[b];
-    if (!arr || dateStr < arr.since) continue;
-    const fixed = arr.days[dow];
-    if (fixed) Object.assign(base[b], fixed);
-  }
-  const morningTB3 = base.TB3.morning, eveningTB3 = base.TB3.evening;
-  const morningTB4 = base.TB4.morning, eveningTB4 = base.TB4.evening;
-
   // Réduit calculé PAR bâtiment (périodes globales communes + override ponctuel d'un seul bâtiment)
   const redTB3 = isReducedFor(date, 'TB3'), redTB4 = isReducedFor(date, 'TB4');
-  const block = (building, red, m, e) => red
-    ? { slots: BUILDING_CONCIERGES[building].map(p => mkShift('9h-17h', p)) }
-    : { morning: mkShift('8h-16h', m), evening: mkShift('11h-19h', e) };
+  const block = (building, red) => {
+    const { concierges, shifts } = org[building];
+    // Réduit : tous ensemble 9h-17h. Un seul concierge : un créneau unique (ex. TB4 9h-17h en 2027).
+    if (red) return { slots: concierges.map(p => mkShift('9h-17h', p)) };
+    if (concierges.length === 1) return { slots: [mkShift(shifts[0], concierges[0])] };
+    const base = parity === 0 ? { morning: concierges[0], evening: concierges[1] }
+                              : { morning: concierges[1], evening: concierges[0] };
+    // Arrangements durables par jour de semaine (voir FIXED_WEEKDAY_SHIFTS) : écrasent l'alternance
+    const arr = FIXED_WEEKDAY_SHIFTS[building];
+    if (arr && dateStr >= arr.since && (!arr.until || dateStr <= arr.until) && arr.days[dow]) Object.assign(base, arr.days[dow]);
+    return { morning: mkShift(shifts[0], base.morning), evening: mkShift(shifts[1], base.evening) };
+  };
   const schedule = {
     date: dateStr, holiday: null, isWeekend: false,
     reduced: redTB3 && redTB4,            // jour entièrement réduit (les 2 bâtiments)
     reducedTB3: redTB3, reducedTB4: redTB4,
-    TB3: block('TB3', redTB3, morningTB3, eveningTB3),
-    TB4: block('TB4', redTB4, morningTB4, eveningTB4)
+    TB3: block('TB3', redTB3),
+    TB4: block('TB4', redTB4)
   };
 
   const absentToday = new Set();
@@ -556,9 +554,9 @@ function applyHalfDays(schedule, dateStr) {
 function coverageGaps(shifts, from, to) {
   const iv = [];
   for (const s of shifts) {
-    const m = /^(\d+)h-(\d+)h$/.exec(s.time || '');
-    if (!m) return [];
-    iv.push([+m[1], +m[2]]);
+    const r = parseRange(s.time);
+    if (!r) return [];
+    iv.push(r);
   }
   iv.sort((x, y) => x[0] - y[0]);
   const gaps = [];
@@ -608,11 +606,13 @@ function applySubs(schedule, absentToday, dateStr) {
   for (const b of ['TB3','TB4']) {
     const blk = schedule[b];
     if (blk.slots) {
-      // Réduit : les 2 concierges du bâtiment ensemble. Si tous absents → 1 renfort ; sinon le(s) présent(s) assurent.
+      // Créneaux partagés (réduit : les concierges du bâtiment ensemble ; ou concierge seul, ex. TB4 en 2027).
+      // Si tous absents → 1 renfort sur le même horaire ; sinon le(s) présent(s) assurent.
       const present = blk.slots.filter(s => !absentToday.has(s.person));
       if (present.length === 0) {
-        const slot = mkShift('9h-17h', pickRenfort());
+        const slot = mkShift(blk.slots[0].time, pickRenfort());
         slot.substituteFor = blk.slots[0].person;
+        slot.vacant = !isEmployed(blk.slots[0].person, dateStr);
         blk.slots = [slot];
       } else {
         blk.slots = present;
@@ -644,7 +644,7 @@ function collectWarnings(sch) {
   const warns = [];
   for (const b of ['TB3','TB4']) {
     const blk = sch[b];
-    if (blk.slots) { if (blk.slots.some(s => !s.person)) warns.push(`${b} : aucun concierge ni remplaçant (9h-17h)`); }
+    if (blk.slots) { if (blk.slots.some(s => !s.person)) warns.push(`${b} : aucun concierge ni remplaçant`); }
     else {
       if (!blk.morning.person) warns.push(`${b} matin : aucun remplaçant`);
       if (!blk.evening.person) warns.push(`${b} soir : aucun remplaçant`);
@@ -661,14 +661,15 @@ function collectWarnings(sch) {
     for (const p of ps) if (p) (parPersonne[p] = parPersonne[p] || new Set()).add(b);
   }
   for (const p in parPersonne) if (parPersonne[p].size > 1) warns.push(`${SN(p)} est sur TB3 ET TB4 le même jour`);
-  // Trou dans l'amplitude d'ouverture (8h-19h, 9h-17h en réduit), typiquement une demi-journée posée
-  // sur la mauvaise moitié du shift. Un shift sans personne est déjà signalé plus haut.
+  // Trou dans l'amplitude d'ouverture (voir openingRange : 8h-19h en 2026, 8h30-18h à TB3 et 9h-17h à TB4
+  // en 2027, 9h-17h en réduit), typiquement une demi-journée posée sur la mauvaise moitié du shift.
+  // Un shift sans personne est déjà signalé plus haut.
   for (const b of ['TB3','TB4']) {
     const blk = sch[b];
     const shifts = blk.slots || [blk.morning, blk.evening];
     if (shifts.some(s => !s.person)) continue;
-    const [from, to] = sch[`reduced${b}`] ? [9, 17] : [8, 19];
-    for (const [a, z] of coverageGaps(shifts, from, to)) warns.push(`${b} : ${a}h-${z}h non couvert`);
+    const [from, to] = openingRange(b, sch.date, sch[`reduced${b}`]);
+    for (const [a, z] of coverageGaps(shifts, from, to)) warns.push(`${b} : ${fmtH(a)}-${fmtH(z)} non couvert`);
   }
   return warns;
 }
@@ -763,7 +764,7 @@ function renderBuildingMini(name, blk, dateStr, reducedBadge) {
 }
 function renderOffRows(building, dateStr) {
   // Une personne partie n'est pas « OFF » : elle n'apparaît simplement plus.
-  const absent = BUILDING_CONCIERGES[building].filter(p => isEmployed(p, dateStr) && isAbsent(p, dateStr));
+  const absent = conciergesOf(building, dateStr).filter(p => isEmployed(p, dateStr) && isAbsent(p, dateStr));
   if (!absent.length) return '';
   return absent.map(p => {
     const meta = COLLABORATORS[p];
@@ -779,10 +780,10 @@ function renderShiftBar(shift, label) {
   const sub = (shift.substituteFor ? `<span class="sub-note">${shift.vacant ? 'poste vacant' : 'remplace ' + SN(shift.substituteFor)}</span>` : '')
             + (shift.halfOff ? `<span class="sub-note">½ journée ${shift.halfOff}</span>` : '');
   return `<div class="shift-bar ${colorClass} ${shift.substituteFor ? 'is-sub' : ''} ${!shift.person ? 'is-none' : ''}">
-      <span class="when">${label}</span><span class="name-wrap"><span class="name">${nm}</span>${sub}</span></div>`;
+      <span class="when">${String(label).replace('-', '-<wbr>')}</span><span class="name-wrap"><span class="name">${nm}</span>${sub}</span></div>`;
 }
 function renderExtraHours(dateStr, building) {
-  const list = (EXTRA_HOURS[dateStr] || []).filter(e => (e.building || COLLABORATORS[e.person]?.building) === building);
+  const list = (EXTRA_HOURS[dateStr] || []).filter(e => (e.building || buildingOf(e.person, dateStr)) === building);
   if (!list.length) return '';
   const chips = list.map(e => {
     const meta = COLLABORATORS[e.person];
@@ -819,7 +820,7 @@ function openLeaveModal(preset) {
       <div>
         <label class="lbl">Qui fait la demande&nbsp;?</label>
         <select id="leave-person" class="leave-input">
-          ${Object.keys(COLLABORATORS).filter(p => isEmployed(p, todayStr)).map(p => `<option value="${p}" ${p === preset ? 'selected' : ''}>${COLLABORATORS[p].shortName}${COLLABORATORS[p].building ? ' — ' + COLLABORATORS[p].building : ' — Renfort'}</option>`).join('')}
+          ${Object.keys(COLLABORATORS).filter(p => isEmployed(p, todayStr)).map(p => `<option value="${p}" ${p === preset ? 'selected' : ''}>${COLLABORATORS[p].shortName} — ${buildingOf(p, todayStr) || 'Renfort'}</option>`).join('')}
         </select>
       </div>
       <div>
@@ -905,6 +906,9 @@ function dayCoverage(requester, dateStr) {
   for (const p of Object.keys(COLLABORATORS)) {
     if (p === requester) continue;
     if (!isAbsent(p, dateStr)) continue;
+    // Un concierge ne compte que s'il tient un poste ce jour-là (voir ORGANISATION) : le poste de Flora,
+    // vacant fin 2026, est à couvrir ; il n'existe plus dans l'organisation de 2027.
+    if (COLLABORATORS[p].role === 'concierge' && !buildingOf(p, dateStr)) continue;
     if (COLLABORATORS[p].role === 'renfort')  absentRenforts.push(p);
     else if (COLLABORATORS[p].role === 'concierge') absentConcierges.push(p);
   }
@@ -1116,7 +1120,7 @@ document.getElementById('period-label').addEventListener('click', goToToday);
 function buildLegend() {
   const people = Object.keys(COLLABORATORS).filter(p => isEmployed(p, todayStr)).map(p => {
     const m = COLLABORATORS[p];
-    return `<div class="legend-row"><span class="legend-dot" style="background:${COLOR_HEX[m.color]}"></span>${m.shortName} — ${m.building || 'Renfort'}</div>`;
+    return `<div class="legend-row"><span class="legend-dot" style="background:${COLOR_HEX[m.color]}"></span>${m.shortName} — ${buildingOf(p, todayStr) || 'Renfort'}</div>`;
   }).join('');
   return `
     <div class="legend-title">Équipe</div>${people}
