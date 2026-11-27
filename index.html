@@ -952,7 +952,7 @@ function openLeaveModal(preset) {
       <div>
         <label class="lbl">Qui fait la demande&nbsp;?</label>
         <select id="leave-person" class="leave-input">
-          ${Object.keys(COLLABORATORS).filter(p => isEmployed(p, todayStr)).map(p => `<option value="${p}" ${p === preset ? 'selected' : ''}>${COLLABORATORS[p].shortName} — ${buildingOf(p, todayStr) || 'Renfort'}</option>`).join('')}
+          ${Object.keys(COLLABORATORS).filter(p => isEmployed(p, todayStr) && !COLLABORATORS[p].end).map(p => `<option value="${p}" ${p === preset ? 'selected' : ''}>${COLLABORATORS[p].shortName} — ${buildingOf(p, todayStr) || 'Renfort'}</option>`).join('')}
         </select>
       </div>
       <div>

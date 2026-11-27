@@ -215,7 +215,11 @@ const ABSENCES = {
     // puis 7 CP : le 1er solde sa poche N-1 (1 j, expire au 31/05/2027), les 6 autres sur la poche N.
     '2027-03-08': 'RTT', '2027-03-09': 'RTT', '2027-03-10': 'RTT',
     '2027-03-11': 'CP', '2027-03-12': 'CP',
-    '2027-03-15': 'CP', '2027-03-16': 'CP', '2027-03-17': 'CP', '2027-03-18': 'CP', '2027-03-19': 'CP'
+    '2027-03-15': 'CP', '2027-03-16': 'CP', '2027-03-17': 'CP', '2027-03-18': 'CP', '2027-03-19': 'CP',
+    // Off du lundi 07 au dimanche 13/06/2027 : 5 jours ouvrés (aucun férié). Même règle : RTT à hauteur de
+    // l'acquis fin juin (7,5 - 3 déjà pris = 4,5) → 4 RTT les 07-10/06, puis 1 CP le 11/06 (poche N-1).
+    '2027-06-07': 'RTT', '2027-06-08': 'RTT', '2027-06-09': 'RTT', '2027-06-10': 'RTT',
+    '2027-06-11': 'CP'
   }
 };
 

@@ -358,7 +358,8 @@ function fmtNum(n) { return Number.isInteger(n) ? String(n) : n.toFixed(1).repla
 function mIdx(y, m) { return y * 12 + m; }
 const ACCRUAL_IDX = mIdx(ACCRUAL_START.y, ACCRUAL_START.m);   // démarrage du suivi : juin 2026
 
-// --- CP : période de référence 1er juin → 31 mai, remise à zéro chaque 31 mai (non pris = perdus) ---
+// --- CP : période de référence 1er juin → 31 mai. Au 31/05, la poche N restante devient la poche N-1
+// (utilisable jusqu'au 31/05 suivant) et l'ancienne N-1 non prise est perdue : voir cpPots. ---
 // Début (juin) de la période de référence contenant (y,m).
 function cpRefStart(y, m) { return mIdx((m >= 5) ? y : y - 1, 5); }  // juin..déc → année y ; janv..mai → y-1
 // Nombre de mois d'acquisition CP dans [startIdx, endIdx] inclus. Après un départ (COLLABORATORS[p].end),
@@ -374,15 +375,18 @@ function accrualMonths(person, startIdx, endIdx) {
   const daysInMonth = new Date(e.getFullYear(), e.getMonth() + 1, 0).getDate();
   return (eIdx - startIdx) + e.getDate() / daysInMonth;
 }
-// CP acquis à fin du mois affiché, DANS la période de référence courante.
-// Le report d'ouverture (solde au 31/05/2026) n'est appliqué qu'à la 1re période (démarrant en juin 2026).
+// CP acquis à fin du mois affiché, DANS la période de référence courante, report compris :
+// 1re période (juin 2026) : le report d'ouverture (solde au 31/05/2026) ; périodes suivantes : la poche N
+// restante au 31/05 précédent, qui devient la poche N-1. Ainsi acquis − pris = solde total de cpPots
+// (sans ce report, le « CP solde » de juin 2027 affichait 1,1 j pour Charles au lieu de 20,1).
 function cpAcquired(person, y, m) {
   const viewIdx = mIdx(y, m);
   const op = (OPENING_BALANCE[person] && OPENING_BALANCE[person].cp) || 0;
   if (viewIdx < ACCRUAL_IDX) return op;                        // avant juin 2026 : on montre le report
-  const startIdx = Math.max(cpRefStart(y, m), ACCRUAL_IDX);
+  const refIdx = cpRefStart(y, m), prevMay = refIdx - 1;
+  const startIdx = Math.max(refIdx, ACCRUAL_IDX);
   const months = accrualMonths(person, startIdx, viewIdx);
-  const seed = (cpRefStart(y, m) <= ACCRUAL_IDX) ? op : 0;     // report seedé sur la 1re période uniquement
+  const seed = refIdx <= ACCRUAL_IDX ? op : cpPots(person, Math.floor(prevMay / 12), prevMay % 12).n;
   return seed + CP_PER_MONTH * months;
 }
 
