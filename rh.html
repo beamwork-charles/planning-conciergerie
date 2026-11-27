@@ -362,7 +362,7 @@ const ACCRUAL_IDX = mIdx(ACCRUAL_START.y, ACCRUAL_START.m);   // démarrage du s
 // Début (juin) de la période de référence contenant (y,m).
 function cpRefStart(y, m) { return mIdx((m >= 5) ? y : y - 1, 5); }  // juin..déc → année y ; janv..mai → y-1
 // Nombre de mois d'acquisition CP dans [startIdx, endIdx] inclus. Après un départ (COLLABORATORS[p].end),
-// plus rien ne s'acquiert ; le mois du départ compte au prorata des jours calendaires (16/11 → 16/30).
+// plus rien ne s'acquiert ; le mois du départ compte au prorata des jours calendaires (16/12 → 16/31).
 // C'est une estimation : le solde de tout compte établi par la paie fait foi.
 function accrualMonths(person, startIdx, endIdx) {
   if (endIdx < startIdx) return 0;
@@ -480,7 +480,7 @@ function renderCounters() {
   document.getElementById('counters-table').innerHTML = html;
 }
 
-// « départ le 16/11 » si la personne quitte l'entreprise pendant le mois (y, m), sinon ''
+// « départ le 16/12 » si la personne quitte l'entreprise pendant le mois (y, m), sinon ''
 function departureLabel(person, y, m) {
   const end = COLLABORATORS[person]?.end;
   if (!end) return '';
