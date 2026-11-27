@@ -108,6 +108,37 @@
   .santa-bubble span:nth-child(2) { animation-delay: .2s; }
   @keyframes santa-oh { 0%, 40%, 100% { transform: translateY(0); } 20% { transform: translateY(-4px); } }
   @media (prefers-reduced-motion: reduce) { .santa-bubble span { animation: none; } .santa-bubble { transition: none; } }
+
+  /* Jour de l'An : ciel de nuit, feu d'artifice (canvas, voir startFireworks) et « Bonne année ! » */
+  .calendar-grid .day-cell.has-fireworks {
+    background: radial-gradient(120% 90% at 50% 112%, #3b2f8f 0%, #1e1b4b 45%, #0b1026 100%);
+    border-color: #312e81; min-height: 200px;
+  }
+  .calendar-grid .day-cell.has-fireworks .day-number,
+  .calendar-grid .day-cell.has-fireworks .day-name { color: #fff; }
+  .calendar-grid .day-cell.has-fireworks .text-red-600,
+  .calendar-grid .day-cell.has-fireworks .text-slate-400 { color: #fecaca; }
+  .calendar-grid .day-cell.has-fireworks > :not(.fireworks):not(.warning-flag) { position: relative; z-index: 1; }
+  /* Cases de fête : jamais grisées pendant leur semaine (jour passé, autre mois, week-end) */
+  .calendar-grid .day-cell.has-fireworks, .calendar-grid .day-cell.has-santa { filter: none; opacity: 1; }
+  .fireworks { position: absolute; inset: 0; z-index: 0; pointer-events: none; }
+  .fireworks canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  .ny-text {
+    position: absolute; left: 6px; right: 6px; bottom: 14px; text-align: center;
+    color: #fde68a; font-size: 16px; font-weight: 900; line-height: 1.05; letter-spacing: -.2px;
+    text-shadow: 0 0 10px rgba(251,191,36,.6);
+    animation: ny-pop .9s cubic-bezier(.34,1.56,.64,1) .2s both;
+  }
+  .ny-text b {
+    display: block; margin-top: 3px; font-size: 26px; letter-spacing: -.5px; text-shadow: none;
+    background: linear-gradient(90deg, #fde68a, #f472b6, #93c5fd, #6ee7b7, #fde68a); background-size: 200% 100%;
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 0 6px rgba(244,114,182,.45));
+    animation: ny-shine 3s linear infinite;
+  }
+  @keyframes ny-pop { from { opacity: 0; transform: scale(.5); } to { opacity: 1; transform: none; } }
+  @keyframes ny-shine { to { background-position: 200% 0; } }
+  @media (prefers-reduced-motion: reduce) { .ny-text, .ny-text b { animation: none; } }
   .bld-card { display: flex; flex-direction: column; gap: 4px; border: 1px solid #e2e8f0; border-radius: 12px; padding: 7px 7px 8px; }
   .bld-card.tb3 { background: rgba(238,242,255,0.8); border-color: #c7d2fe; }
   .bld-card.tb4 { background: rgba(240,253,250,0.85); border-color: #99f6e4; }
@@ -280,6 +311,7 @@
     /* Vue agenda : la case de Noël garde de la hauteur, le Père Noël sort à droite */
     .day-cell.has-santa { min-height: 175px; align-items: flex-start; }
     .santa { left: auto; right: 4px; transform: none; width: 170px; }
+    .calendar-grid .day-cell.has-fireworks { min-height: 160px; align-items: flex-start; }
     /* TB3 et TB4 côte à côte */
     .day-buildings { flex-direction: row; gap: 8px; }
     .day-buildings .bld-card { flex: 1; min-width: 0; padding: 8px; }
@@ -734,6 +766,7 @@ function renderCalendar() {
   html += '</div>';
   container.innerHTML = html;
   mountSantas(container);
+  mountFireworks(container);
 }
 
 // Père Noël du 25/12 : animation Lottie (santa-unicorn.json), montée par mountSantas après chaque rendu
@@ -741,13 +774,89 @@ const SANTA_HTML = `<div class="santa" role="img" aria-label="Le Père Noël sor
   <div class="santa-bubble" aria-hidden="true"><span>Joyeux</span> <span>Noël&nbsp;!</span></div>
   <div class="santa-anim" aria-hidden="true"></div>
 </div>`;
-// Vrai si `ref` (aujourd'hui par défaut) tombe dans la semaine, du lundi au dimanche, qui contient ce 25/12
-// (2026 : du 21 au 27/12 ; 2027 : du 20 au 26/12). Avant et après, la case de Noël reste sans Père Noël.
-function isChristmasWeek(xmasStr, ref = today) {
-  const monday = parseD(xmasStr);
+// Vrai si `ref` (aujourd'hui par défaut) tombe dans la semaine, du lundi au dimanche, qui contient ce jour.
+// Sert aux cases de fête : Noël 2026 du 21 au 27/12, jour de l'An 2027 du 28/12/2026 au 03/01/2027.
+function isInWeekOf(dayStr, ref = today) {
+  const monday = parseD(dayStr);
   monday.setDate(monday.getDate() - (monday.getDay() + 6) % 7);
   const nextMonday = new Date(monday); nextMonday.setDate(monday.getDate() + 7);
   return ref >= monday && ref < nextMonday;
+}
+
+// Jour de l'An : feu d'artifice dessiné sur un canvas, sous « Bonne année <année> ! »
+const fireworksHtml = year => `<div class="fireworks" role="img" aria-label="Feu d'artifice : bonne année ${year} !">
+  <canvas aria-hidden="true"></canvas><div class="ny-text" aria-hidden="true">Bonne année<b>${year}&nbsp;!</b></div>
+</div>`;
+let fireworksStops = [];
+function mountFireworks(root) {
+  fireworksStops.forEach(stop => stop()); fireworksStops = [];
+  root.querySelectorAll('.fireworks canvas').forEach(cv => fireworksStops.push(startFireworks(cv)));
+}
+// Des fusées montent du bas et éclatent en gerbes ; chaque image efface un peu la précédente (traînées).
+// Vitesses en pixels par image à 60 i/s, ajustées à la taille de la case. Renvoie la fonction d'arrêt.
+function startFireworks(canvas) {
+  const ctx = canvas.getContext('2d');
+  const COLORS = ['#fde047', '#f472b6', '#60a5fa', '#34d399', '#f87171', '#c084fc', '#fb923c'];
+  const rnd = (a, b) => a + Math.random() * (b - a), pick = () => COLORS[Math.floor(Math.random() * COLORS.length)];
+  const rockets = [], sparks = [];
+  let w = 0, h = 0, raf = 0, last = 0, nextLaunch = 0, stopped = false;
+  function fit() {
+    const r = canvas.getBoundingClientRect(), dpr = Math.min(2, window.devicePixelRatio || 1);
+    if (Math.round(r.width) === w && Math.round(r.height) === h) return;
+    w = Math.round(r.width); h = Math.round(r.height);
+    canvas.width = w * dpr; canvas.height = h * dpr; ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  const gravity = () => h * .00025;
+  function launch() {
+    const top = rnd(.12, .42) * h;
+    rockets.push({ x: rnd(.18, .82) * w, y: h, vx: rnd(-.25, .25), vy: -Math.sqrt(2 * gravity() * (h - top)) * 1.05, top, color: pick() });
+  }
+  function burst(x, y, color) {
+    const n = 26 + Math.floor(Math.random() * 14), speed = Math.min(w, h) * rnd(.012, .018), other = Math.random() < .35 ? pick() : color;
+    for (let i = 0; i < n; i++) {
+      const a = i / n * Math.PI * 2 + rnd(-.05, .05), s = speed * rnd(.55, 1);
+      sparks.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: 1, decay: rnd(.011, .02), color: i % 2 ? color : other });
+    }
+  }
+  function step(k) {                 // k = nombre d'images à 60 i/s écoulées
+    const g = gravity(), drag = Math.pow(.97, k);
+    ctx.globalCompositeOperation = 'destination-out';
+    ctx.fillStyle = `rgba(0,0,0,${Math.min(1, .22 * k)})`; ctx.fillRect(0, 0, w, h);
+    ctx.globalCompositeOperation = 'lighter';
+    for (let i = rockets.length - 1; i >= 0; i--) {
+      const r = rockets[i];
+      r.x += r.vx * k; r.y += r.vy * k; r.vy += g * k;
+      ctx.fillStyle = r.color; ctx.beginPath(); ctx.arc(r.x, r.y, 1.6, 0, 6.283); ctx.fill();
+      if (r.y <= r.top || r.vy >= 0) { burst(r.x, r.y, r.color); rockets.splice(i, 1); }
+    }
+    for (let i = sparks.length - 1; i >= 0; i--) {
+      const s = sparks[i];
+      s.vx *= drag; s.vy = s.vy * drag + g * .45 * k; s.x += s.vx * k; s.y += s.vy * k; s.life -= s.decay * k;
+      if (s.life <= 0) { sparks.splice(i, 1); continue; }
+      ctx.globalAlpha = s.life; ctx.fillStyle = s.color;
+      ctx.beginPath(); ctx.arc(s.x, s.y, 1.1 + s.life * 1.1, 0, 6.283); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
+  function frame(t) {
+    if (stopped) return;
+    fit();
+    if (w && h) {                    // case masquée (autre mois sur mobile) : rien à dessiner
+      const k = last ? Math.min(3, (t - last) / 16.67) : 1; last = t;
+      if (t >= nextLaunch) { launch(); nextLaunch = t + rnd(350, 900); }
+      step(k);
+    }
+    raf = requestAnimationFrame(frame);
+  }
+  fit();
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    // Mouvement réduit : une image fixe, trois gerbes déjà ouvertes
+    [[.3, .3], [.7, .22], [.5, .44]].forEach(([x, y], i) => burst(x * w, y * h, COLORS[i * 2]));
+    for (let i = 0; i < 18; i++) step(1);
+    return () => {};
+  }
+  raf = requestAnimationFrame(frame);
+  return () => { stopped = true; cancelAnimationFrame(raf); };
 }
 // lottie-web n'est chargé que si une case de Noël est affichée
 const LOTTIE_SRC = 'https://cdnjs.cloudflare.com/ajax/libs/lottie-web/5.12.2/lottie_light.min.js';
@@ -795,9 +904,13 @@ function renderDayCell(date, isCurrent, isToday) {
   if (isToday) cls.push('today');
   if (sch.reduced) cls.push('reduced');
   if (date.getTime() < today.getTime()) cls.push('past');
-  // Le jour de Noël, le Père Noël sort du bas de la case, seulement pendant la semaine de Noël
-  const santa = sch.date.endsWith('-12-25') && isChristmasWeek(sch.date) ? SANTA_HTML : '';
+  // Cases de fête, seulement pendant leur semaine (lundi → dimanche) : le Père Noël sort du bas de la case
+  // du 25/12, le feu d'artifice éclate dans celle du 1er janvier
+  const santa = sch.date.endsWith('-12-25') && isInWeekOf(sch.date) ? SANTA_HTML : '';
+  const fireworks = sch.date.endsWith('-01-01') && isInWeekOf(sch.date) ? fireworksHtml(date.getFullYear()) : '';
   if (santa) cls.push('has-santa');
+  if (fireworks) cls.push('has-fireworks');
+  const festive = santa + fireworks;
 
   let html = `<div class="${cls.join(' ')}">`;
   if (sch.warnings && sch.warnings.length) html += `<div class="warning-flag" title="${sch.warnings.join(' · ')}">!</div>`;
@@ -812,8 +925,8 @@ function renderDayCell(date, isCurrent, isToday) {
   const msg = DAY_MESSAGES[sch.date];
   if (msg) html += `<div class="day-msg clr-${COLLABORATORS[msg.person]?.color || 'none'}">${msg.text}</div>`;
 
-  if (sch.isWeekend) return html + `<div class="text-[11px] text-slate-400 italic mt-2">Weekend</div>${santa}</div>`;
-  if (sch.holiday)   return html + `<div class="text-[11px] text-red-600 font-semibold mt-1">${sch.holiday}</div>${santa}</div>`;
+  if (sch.isWeekend) return html + `<div class="text-[11px] text-slate-400 italic mt-2">Weekend</div>${festive}</div>`;
+  if (sch.holiday)   return html + `<div class="text-[11px] text-red-600 font-semibold mt-1">${sch.holiday}</div>${festive}</div>`;
 
   html += `<div class="day-buildings">`;
   html += renderBuildingMini('TB3', sch.TB3, sch.date, sch.reducedTB3 && !sch.reduced);
