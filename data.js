@@ -69,11 +69,14 @@ const ORGANISATION = [
   { since: '2026-06-01',
     TB3: { concierges: ['Flora', 'Emilie'], shifts: ['8h-16h', '11h-19h'] },
     TB4: { concierges: ['Cédric', 'Chiara'], shifts: ['8h-16h', '11h-19h'] } },
-  // 01/01/2027 : TB3 ouvert 8h30-18h avec Émilie et Cédric (Cédric quitte TB4), TB4 ouvert 9h-17h avec
-  // Chiara seule. Émilie et Cédric gardent chacun leur rythme matin/soir de 2026, qui s'emboîtent.
-  // Shifts TB3 de 8 h comme avant, calés sur l'ouverture et la fermeture : 8h30-16h30 et 10h-18h.
-  { since: '2027-01-01',
-    TB3: { concierges: ['Cédric', 'Emilie'], shifts: ['8h30-16h30', '10h-18h'] },
+  // 21/12/2026, vacances de Noël : Cédric quitte TB4 et rejoint Émilie à TB3 pour prendre ses marques avant
+  // janvier ; Chiara passe seule à TB4. Ces deux semaines sont entièrement en horaires réduits (Émilie et
+  // Cédric ensemble à TB3 en 9h-17h) : les horaires ci-dessous ne jouent qu'à partir du lundi 04/01/2027.
+  // 01/01/2027 : TB3 ouvert 8h30-18h, TB4 ouvert 9h-17h. Shifts TB3 de 8 h comme avant, calés sur l'ouverture
+  // et la fermeture : 8h30-16h30 et 10h-18h. Semaine du 04/01 : Émilie du matin, Cédric du 2e shift
+  // (10h-18h), puis on inverse chaque semaine.
+  { since: '2026-12-21',
+    TB3: { concierges: ['Emilie', 'Cédric'], shifts: ['8h30-16h30', '10h-18h'] },
     TB4: { concierges: ['Chiara'], shifts: ['9h-17h'] } },
 ];
 function orgFor(dateStr) {
@@ -147,7 +150,8 @@ const ABSENCES = {
     // 18/11 : journée entière, Dynah prend son shift du matin (remplacement automatique).
     // 25/11 : Chiara est du soir → elle fait 15h-19h, Cédric (8h-16h) couvre le matin.
     '2026-11-17': { type: 'CP', half: 'aprem' }, '2026-11-18': 'CP', '2026-11-25': { type: 'CP', half: 'matin' },
-    // CP jeudi 31/12 (1 jour ouvré). Horaires réduits ce jour-là : Cédric assure seul TB4 en 9h-17h.
+    // CP jeudi 31/12 (1 jour ouvré). Chiara étant seule à TB4 depuis le 21/12, un renfort (Dynah) tient
+    // TB4 en 9h-17h ce jour-là (remplacement automatique).
     '2026-12-31': 'CP'
   },
   Cédric:  {
@@ -265,13 +269,13 @@ const FIXED_WEEKDAY_SHIFTS = {
   // jeudis matin (fin à 16h) ; en contrepartie Émilie prend tous les vendredis matin.
   // Neutre sur le cycle de 2 semaines : chacune garde 5 matins et 5 soirs.
   // Ne s'applique PAS en horaires réduits : ces jours-là les deux concierges du bâtiment
-  // travaillent ensemble 9h-17h, Flora finit donc à 17h comme tout le monde (arbitré le 01/09/2026 —
-  // concerne les jeudis 24/12 et 31/12/2026). Rien à coder : block() ignore morning/evening en réduit.
+  // travaillent ensemble 9h-17h, Flora finit donc à 17h comme tout le monde (arbitré le 01/09/2026).
+  // Rien à coder : block() ignore morning/evening en réduit.
   TB3: {
     since: '2026-09-01',   // date de l'accord — l'historique d'avant garde l'alternance normale
-    // Fin avec la nouvelle organisation du 01/01/2027 (Flora part le 16/12 ; d'ici là son créneau
+    // Fin avec l'arrivée de Cédric à TB3 le 21/12 (Flora part le 16/12 ; les 17 et 18/12, son créneau
     // du jeudi matin / vendredi soir passe au renfort et Émilie garde ses jeudis soir / vendredis matin).
-    until: '2026-12-31',
+    until: '2026-12-20',
     days: {
       4: { morning: 'Flora',  evening: 'Emilie' },   // jeudi
       5: { morning: 'Emilie', evening: 'Flora'  }    // vendredi

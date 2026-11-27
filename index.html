@@ -83,6 +83,29 @@
     font-size: 10.5px; font-weight: 800; line-height: 1.25;
     background: var(--c); color: #fff;   /* plein : reste lisible une fois la journée passée (case grisée) */
   }
+  /* Père Noël du 25/12 : il rit (« Oh oh oh ! »), chaque « oh » sautille à son tour */
+  .santa { display: flex; flex-direction: column; align-items: center; gap: 2px; margin-top: 10px; }
+  .santa-bubble {
+    position: relative; padding: 4px 9px; border-radius: 12px; background: #fff; border: 1.5px solid #fca5a5;
+    color: #dc2626; font-size: 11.5px; font-weight: 800; white-space: nowrap; box-shadow: 0 4px 10px -6px rgba(220,38,38,.55);
+  }
+  .santa-bubble::after {
+    content: ''; position: absolute; left: 50%; bottom: -6px; margin-left: -5px;
+    border: 5px solid transparent; border-bottom: 0; border-top: 6px solid #fca5a5;
+  }
+  .santa-bubble span { display: inline-block; animation: santa-oh 1.6s ease-in-out infinite; }
+  .santa-bubble span:nth-child(2) { animation-delay: .2s; }
+  .santa-bubble span:nth-child(3) { animation-delay: .4s; }
+  .santa svg { width: 58px; height: 65px; transform-origin: 50% 92%; animation: santa-laugh 1.6s ease-in-out infinite; }
+  @keyframes santa-laugh {
+    0%, 70%, 100% { transform: rotate(0) translateY(0); }
+    12% { transform: rotate(-8deg) translateY(-3px); }
+    26% { transform: rotate(7deg) translateY(0); }
+    40% { transform: rotate(-6deg) translateY(-3px); }
+    54% { transform: rotate(4deg) translateY(0); }
+  }
+  @keyframes santa-oh { 0%, 30%, 100% { transform: translateY(0); } 15% { transform: translateY(-5px); } }
+  @media (prefers-reduced-motion: reduce) { .santa svg, .santa-bubble span { animation: none; } }
   .bld-card { display: flex; flex-direction: column; gap: 4px; border: 1px solid #e2e8f0; border-radius: 12px; padding: 7px 7px 8px; }
   .bld-card.tb3 { background: rgba(238,242,255,0.8); border-color: #c7d2fe; }
   .bld-card.tb4 { background: rgba(240,253,250,0.85); border-color: #99f6e4; }
@@ -707,6 +730,24 @@ function renderCalendar() {
   container.innerHTML = html;
 }
 
+// Père Noël dessiné (bonnet, barbe, rire), affiché dans la case du 25/12
+const SANTA_HTML = `<div class="santa" role="img" aria-label="Le Père Noël rit : Oh oh oh !">
+  <div class="santa-bubble" aria-hidden="true"><span>Oh</span> <span>oh</span> <span>oh&nbsp;!</span></div>
+  <svg viewBox="0 0 64 72" aria-hidden="true">
+    <path d="M12 72Q14 59 32 59Q50 59 52 72Z" fill="#dc2626"/>
+    <circle cx="32" cy="37" r="14" fill="#fcd9b8"/>
+    <path d="M24 37Q27 33 30 37M34 37Q37 33 40 37" fill="none" stroke="#3b2a20" stroke-width="2" stroke-linecap="round"/>
+    <circle cx="21.5" cy="41.5" r="3.2" fill="#f9a8b4"/><circle cx="42.5" cy="41.5" r="3.2" fill="#f9a8b4"/>
+    <path d="M16 42Q15 58 23 63Q27 69 32 66Q37 69 41 63Q49 58 48 42Q43 49 32 49Q21 49 16 42Z" fill="#fff" stroke="#e2e8f0"/>
+    <ellipse cx="32" cy="53" rx="5.5" ry="5" fill="#9f1239"/><ellipse cx="32" cy="56" rx="3.2" ry="1.7" fill="#fb7185"/>
+    <path d="M32 47Q26 42.5 20.5 47.5Q26 51 32 48Q38 51 43.5 47.5Q38 42.5 32 47Z" fill="#fff" stroke="#e2e8f0"/>
+    <circle cx="32" cy="42.5" r="3" fill="#f4a08a"/>
+    <path d="M17 27L47 27L53 6Z" fill="#dc2626"/>
+    <rect x="14" y="23" width="36" height="8" rx="4" fill="#fff" stroke="#e2e8f0"/>
+    <circle cx="53" cy="7" r="5" fill="#fff" stroke="#e2e8f0"/>
+  </svg>
+</div>`;
+
 function renderDayCell(date, isCurrent, isToday) {
   const sch = genDay(date);
   const dayNum = date.getDate();
@@ -731,8 +772,10 @@ function renderDayCell(date, isCurrent, isToday) {
   const msg = DAY_MESSAGES[sch.date];
   if (msg) html += `<div class="day-msg clr-${COLLABORATORS[msg.person]?.color || 'none'}">${msg.text}</div>`;
 
-  if (sch.isWeekend) return html + `<div class="text-[11px] text-slate-400 italic mt-2">Weekend</div></div>`;
-  if (sch.holiday)   return html + `<div class="text-[11px] text-red-600 font-semibold mt-1">${sch.holiday}</div></div>`;
+  // Le jour de Noël (chaque année, même un week-end), un petit Père Noël qui rit
+  const santa = sch.date.endsWith('-12-25') ? SANTA_HTML : '';
+  if (sch.isWeekend) return html + `<div class="text-[11px] text-slate-400 italic mt-2">Weekend</div>${santa}</div>`;
+  if (sch.holiday)   return html + `<div class="text-[11px] text-red-600 font-semibold mt-1">${sch.holiday}</div>${santa}</div>`;
 
   html += `<div class="day-buildings">`;
   html += renderBuildingMini('TB3', sch.TB3, sch.date, sch.reducedTB3 && !sch.reduced);
