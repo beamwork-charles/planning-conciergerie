@@ -741,6 +741,14 @@ const SANTA_HTML = `<div class="santa" role="img" aria-label="Le Père Noël sor
   <div class="santa-bubble" aria-hidden="true"><span>Joyeux</span> <span>Noël&nbsp;!</span></div>
   <div class="santa-anim" aria-hidden="true"></div>
 </div>`;
+// Vrai si `ref` (aujourd'hui par défaut) tombe dans la semaine, du lundi au dimanche, qui contient ce 25/12
+// (2026 : du 21 au 27/12 ; 2027 : du 20 au 26/12). Avant et après, la case de Noël reste sans Père Noël.
+function isChristmasWeek(xmasStr, ref = today) {
+  const monday = parseD(xmasStr);
+  monday.setDate(monday.getDate() - (monday.getDay() + 6) % 7);
+  const nextMonday = new Date(monday); nextMonday.setDate(monday.getDate() + 7);
+  return ref >= monday && ref < nextMonday;
+}
 // lottie-web n'est chargé que si une case de Noël est affichée
 const LOTTIE_SRC = 'https://cdnjs.cloudflare.com/ajax/libs/lottie-web/5.12.2/lottie_light.min.js';
 let lottieLoading = null, santaAnims = [];
@@ -787,8 +795,8 @@ function renderDayCell(date, isCurrent, isToday) {
   if (isToday) cls.push('today');
   if (sch.reduced) cls.push('reduced');
   if (date.getTime() < today.getTime()) cls.push('past');
-  // Le jour de Noël (chaque année, même un week-end), le Père Noël sort du bas de la case
-  const santa = sch.date.endsWith('-12-25') ? SANTA_HTML : '';
+  // Le jour de Noël, le Père Noël sort du bas de la case, seulement pendant la semaine de Noël
+  const santa = sch.date.endsWith('-12-25') && isChristmasWeek(sch.date) ? SANTA_HTML : '';
   if (santa) cls.push('has-santa');
 
   let html = `<div class="${cls.join(' ')}">`;
