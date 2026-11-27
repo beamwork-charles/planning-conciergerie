@@ -83,29 +83,32 @@
     font-size: 10.5px; font-weight: 800; line-height: 1.25;
     background: var(--c); color: #fff;   /* plein : reste lisible une fois la journée passée (case grisée) */
   }
-  /* Père Noël du 25/12 : il rit (« Oh oh oh ! »), chaque « oh » sautille à son tour */
-  .santa { display: flex; flex-direction: column; align-items: center; gap: 2px; margin-top: 10px; }
-  .santa-bubble {
-    position: relative; padding: 4px 9px; border-radius: 12px; background: #fff; border: 1.5px solid #fca5a5;
-    color: #dc2626; font-size: 11.5px; font-weight: 800; white-space: nowrap; box-shadow: 0 4px 10px -6px rgba(220,38,38,.55);
+  /* Père Noël du 25/12 : animation Lottie (santa-unicorn.json) calée sur le bas de la case. L'animation
+     le fait elle-même surgir du bas du cadre puis replonger (boucle de 3 s) ; la bulle « Oh oh oh ! »
+     ne s'affiche que pendant qu'il est sorti (classe .up posée par mountSantas). */
+  .day-cell.has-santa { min-height: 200px; }
+  .santa {
+    position: absolute; left: 50%; bottom: 0; transform: translateX(-50%);
+    width: min(125%, 190px); aspect-ratio: 1; pointer-events: none;   /* déborde sur les côtés vides du cadre */
   }
+  .santa-anim { position: absolute; inset: 0; }
+  .santa-anim svg { display: block; }
+  .santa-bubble {
+    position: absolute; left: 50%; top: 13%; z-index: 1; padding: 3px 8px; border-radius: 12px;
+    background: #fff; border: 1.5px solid #fca5a5; color: #dc2626; font-size: 11px; font-weight: 800;
+    white-space: nowrap; box-shadow: 0 4px 10px -6px rgba(220,38,38,.55);
+    opacity: 0; transform: translateX(-50%) scale(.6); transition: opacity .15s ease, transform .2s cubic-bezier(.34,1.56,.64,1);
+  }
+  .santa.up .santa-bubble { opacity: 1; transform: translateX(-50%) scale(1); }
   .santa-bubble::after {
     content: ''; position: absolute; left: 50%; bottom: -6px; margin-left: -5px;
     border: 5px solid transparent; border-bottom: 0; border-top: 6px solid #fca5a5;
   }
-  .santa-bubble span { display: inline-block; animation: santa-oh 1.6s ease-in-out infinite; }
-  .santa-bubble span:nth-child(2) { animation-delay: .2s; }
-  .santa-bubble span:nth-child(3) { animation-delay: .4s; }
-  .santa svg { width: 58px; height: 65px; transform-origin: 50% 92%; animation: santa-laugh 1.6s ease-in-out infinite; }
-  @keyframes santa-laugh {
-    0%, 70%, 100% { transform: rotate(0) translateY(0); }
-    12% { transform: rotate(-8deg) translateY(-3px); }
-    26% { transform: rotate(7deg) translateY(0); }
-    40% { transform: rotate(-6deg) translateY(-3px); }
-    54% { transform: rotate(4deg) translateY(0); }
-  }
-  @keyframes santa-oh { 0%, 30%, 100% { transform: translateY(0); } 15% { transform: translateY(-5px); } }
-  @media (prefers-reduced-motion: reduce) { .santa svg, .santa-bubble span { animation: none; } }
+  .santa-bubble span { display: inline-block; animation: santa-oh .9s ease-in-out infinite; }
+  .santa-bubble span:nth-child(2) { animation-delay: .15s; }
+  .santa-bubble span:nth-child(3) { animation-delay: .3s; }
+  @keyframes santa-oh { 0%, 40%, 100% { transform: translateY(0); } 20% { transform: translateY(-4px); } }
+  @media (prefers-reduced-motion: reduce) { .santa-bubble span { animation: none; } .santa-bubble { transition: none; } }
   .bld-card { display: flex; flex-direction: column; gap: 4px; border: 1px solid #e2e8f0; border-radius: 12px; padding: 7px 7px 8px; }
   .bld-card.tb3 { background: rgba(238,242,255,0.8); border-color: #c7d2fe; }
   .bld-card.tb4 { background: rgba(240,253,250,0.85); border-color: #99f6e4; }
@@ -275,6 +278,9 @@
       flex-direction: row; align-items: center; padding: 10px 16px; gap: 12px;
     }
     .day-cell.weekend > div:last-child, .day-cell.holiday > div:last-child { margin: 0; }
+    /* Vue agenda : la case de Noël garde de la hauteur, le Père Noël sort à droite */
+    .day-cell.has-santa { min-height: 175px; align-items: flex-start; }
+    .santa { left: auto; right: 4px; transform: none; width: 170px; }
     /* TB3 et TB4 côte à côte */
     .day-buildings { flex-direction: row; gap: 8px; }
     .day-buildings .bld-card { flex: 1; min-width: 0; padding: 8px; }
@@ -728,25 +734,49 @@ function renderCalendar() {
   }
   html += '</div>';
   container.innerHTML = html;
+  mountSantas(container);
 }
 
-// Père Noël dessiné (bonnet, barbe, rire), affiché dans la case du 25/12
-const SANTA_HTML = `<div class="santa" role="img" aria-label="Le Père Noël rit : Oh oh oh !">
+// Père Noël du 25/12 : animation Lottie (santa-unicorn.json), montée par mountSantas après chaque rendu
+const SANTA_HTML = `<div class="santa" role="img" aria-label="Le Père Noël sort du bas de la case : Oh oh oh !">
   <div class="santa-bubble" aria-hidden="true"><span>Oh</span> <span>oh</span> <span>oh&nbsp;!</span></div>
-  <svg viewBox="0 0 64 72" aria-hidden="true">
-    <path d="M12 72Q14 59 32 59Q50 59 52 72Z" fill="#dc2626"/>
-    <circle cx="32" cy="37" r="14" fill="#fcd9b8"/>
-    <path d="M24 37Q27 33 30 37M34 37Q37 33 40 37" fill="none" stroke="#3b2a20" stroke-width="2" stroke-linecap="round"/>
-    <circle cx="21.5" cy="41.5" r="3.2" fill="#f9a8b4"/><circle cx="42.5" cy="41.5" r="3.2" fill="#f9a8b4"/>
-    <path d="M16 42Q15 58 23 63Q27 69 32 66Q37 69 41 63Q49 58 48 42Q43 49 32 49Q21 49 16 42Z" fill="#fff" stroke="#e2e8f0"/>
-    <ellipse cx="32" cy="53" rx="5.5" ry="5" fill="#9f1239"/><ellipse cx="32" cy="56" rx="3.2" ry="1.7" fill="#fb7185"/>
-    <path d="M32 47Q26 42.5 20.5 47.5Q26 51 32 48Q38 51 43.5 47.5Q38 42.5 32 47Z" fill="#fff" stroke="#e2e8f0"/>
-    <circle cx="32" cy="42.5" r="3" fill="#f4a08a"/>
-    <path d="M17 27L47 27L53 6Z" fill="#dc2626"/>
-    <rect x="14" y="23" width="36" height="8" rx="4" fill="#fff" stroke="#e2e8f0"/>
-    <circle cx="53" cy="7" r="5" fill="#fff" stroke="#e2e8f0"/>
-  </svg>
+  <div class="santa-anim" aria-hidden="true"></div>
 </div>`;
+// lottie-web n'est chargé que si une case de Noël est affichée
+const LOTTIE_SRC = 'https://cdnjs.cloudflare.com/ajax/libs/lottie-web/5.12.2/lottie_light.min.js';
+let lottieLoading = null, santaAnims = [];
+function loadLottie() {
+  if (window.lottie) return Promise.resolve(window.lottie);
+  return lottieLoading ||= new Promise((ok, ko) => {
+    const s = document.createElement('script');
+    s.src = LOTTIE_SRC; s.onload = () => ok(window.lottie); s.onerror = ko;
+    document.head.append(s);
+  });
+}
+// Dans l'animation (60 images/s), il est sorti de l'image 8 à l'image 88, puis replonge
+const SANTA_UP = [10, 86];
+function mountSantas(root) {
+  santaAnims.forEach(a => a.destroy()); santaAnims = [];
+  const boxes = [...root.querySelectorAll('.santa-anim')];
+  if (!boxes.length) return;
+  loadLottie().then(lottie => {
+    const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    for (const box of boxes) {
+      if (!box.isConnected) continue;          // le mois a été re-rendu entre-temps
+      const wrap = box.closest('.santa');
+      const anim = lottie.loadAnimation({
+        container: box, renderer: 'svg', loop: !still, autoplay: !still, path: 'santa-unicorn.json',
+        rendererSettings: { preserveAspectRatio: 'xMidYMax meet' }   // bas du cadre = bas de la case
+      });
+      if (still) anim.addEventListener('DOMLoaded', () => { anim.goToAndStop(48, true); wrap.classList.add('up'); });
+      else anim.addEventListener('enterFrame', e => {
+        const up = e.currentTime >= SANTA_UP[0] && e.currentTime < SANTA_UP[1];
+        if (up !== wrap.classList.contains('up')) wrap.classList.toggle('up', up);
+      });
+      santaAnims.push(anim);
+    }
+  }).catch(() => boxes.forEach(b => b.closest('.santa')?.remove()));
+}
 
 function renderDayCell(date, isCurrent, isToday) {
   const sch = genDay(date);
@@ -758,6 +788,9 @@ function renderDayCell(date, isCurrent, isToday) {
   if (isToday) cls.push('today');
   if (sch.reduced) cls.push('reduced');
   if (date.getTime() < today.getTime()) cls.push('past');
+  // Le jour de Noël (chaque année, même un week-end), le Père Noël sort du bas de la case
+  const santa = sch.date.endsWith('-12-25') ? SANTA_HTML : '';
+  if (santa) cls.push('has-santa');
 
   let html = `<div class="${cls.join(' ')}">`;
   if (sch.warnings && sch.warnings.length) html += `<div class="warning-flag" title="${sch.warnings.join(' · ')}">!</div>`;
@@ -772,8 +805,6 @@ function renderDayCell(date, isCurrent, isToday) {
   const msg = DAY_MESSAGES[sch.date];
   if (msg) html += `<div class="day-msg clr-${COLLABORATORS[msg.person]?.color || 'none'}">${msg.text}</div>`;
 
-  // Le jour de Noël (chaque année, même un week-end), un petit Père Noël qui rit
-  const santa = sch.date.endsWith('-12-25') ? SANTA_HTML : '';
   if (sch.isWeekend) return html + `<div class="text-[11px] text-slate-400 italic mt-2">Weekend</div>${santa}</div>`;
   if (sch.holiday)   return html + `<div class="text-[11px] text-red-600 font-semibold mt-1">${sch.holiday}</div>${santa}</div>`;
 
