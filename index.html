@@ -223,6 +223,54 @@
   }
   @keyframes pop { from { transform: translateY(8px) scale(.98); opacity: 0; } to { transform: none; opacity: 1; } }
 
+  /* Déroulé de la journée (organisation à 3, voir DAY_PLAN dans data.js) */
+  .dayplan-card { max-width: 760px; }
+  .dp-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 20px 22px 4px; }
+  .dp-kicker { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .8px; color: #94a3b8; }
+  .dp-title { margin: 3px 0 0; font-size: 20px; font-weight: 800; color: #0f172a; line-height: 1.2; }
+  .dp-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .dp-tag { font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 999px; background: #f1f5f9; color: #475569; }
+  .dp-tag.reduced { background: #fef3c7; color: #b45309; }
+  .dp-close { width: 36px; height: 36px; flex-shrink: 0; border-radius: 10px; border: 1px solid #e2e8f0; background: white; color: #64748b; font-size: 22px; line-height: 1; cursor: pointer; }
+  .dp-close:hover { background: #f8fafc; }
+  .dp-body { padding: 10px 22px 4px; }
+  .dp-chart { position: relative; padding-top: 42px; }
+  .dp-tick { position: absolute; top: 36px; bottom: 0; border-left: 1.5px dashed #d1d5db; }
+  .dp-tick span { position: absolute; top: -36px; transform: translateX(-50%); font-size: 12.5px; line-height: 16px; font-weight: 600; color: #334155; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .dp-tick.low span { top: -18px; }
+  .dp-tick.first span { transform: none; }
+  .dp-tick.last span { transform: translateX(-100%); }
+  .dp-row { position: relative; margin-bottom: 20px; }
+  .dp-row-title { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 10px; margin-bottom: 8px; font-size: 16px; font-weight: 800; color: #0f172a; }
+  .dp-row-title small { font-size: 12.5px; font-weight: 600; color: #64748b; }
+  .dp-track { position: relative; height: 46px; }
+  .dp-bar {
+    position: absolute; top: 0; bottom: 0; border-radius: 5px; overflow: hidden;
+    display: flex; align-items: center; justify-content: center; padding: 0 3px;
+    font-size: 13.5px; font-weight: 500; color: white; white-space: nowrap;
+  }
+  .dp-bar.tb3 { background: #5279a8; }
+  .dp-bar.tb4 { background: #3f8a70; }
+  .dp-bar.pause { background: #d5d9de; color: #374151; }
+  .dp-bar.trajet { background: #c79a55; }
+  .dp-legend { display: flex; flex-wrap: wrap; gap: 6px 18px; padding-top: 2px; font-size: 12.5px; color: #475569; }
+  .dp-legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .dp-legend i { width: 11px; height: 11px; border-radius: 50%; }
+  .dp-note { margin: 4px 0 12px; padding: 8px 11px; border-radius: 10px; font-size: 12.5px; color: #92400e; background: #fffbeb; border: 1px solid #fde68a; }
+  .dp-foot { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px 16px; padding: 14px 22px 20px; }
+  .dp-hint { font-size: 12px; color: #94a3b8; }
+  .dp-ok { padding: 10px 20px; border-radius: 12px; border: 0; background: #0f172a; color: white; font-size: 14px; font-weight: 700; cursor: pointer; }
+  .dp-ok:hover { background: #1e293b; }
+  .day-cell.has-plan { cursor: pointer; }
+  .day-cell.has-plan:focus-visible { outline: 2px solid #3b82f6; outline-offset: 2px; }
+  @media (max-width: 600px) {
+    .dp-head, .dp-foot { padding-left: 16px; padding-right: 16px; }
+    .dp-body { padding-left: 16px; padding-right: 16px; }
+    .dp-bar { font-size: 10.5px; padding: 0 1px; letter-spacing: -.15px; }
+    .dp-tick span { font-size: 10.5px; }
+    .dp-track { height: 40px; }
+  }
+
   /* Leave form */
   .leave-row { display: flex; gap: 8px; align-items: flex-end; margin-bottom: 8px; }
   .lbl { font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: .4px; }
@@ -498,6 +546,13 @@
       <button id="summer-leave-btn" class="summer-cta">🌴 Faire ma demande</button>
       <button onclick="closeModal('summer-modal')" class="summer-later">Plus tard</button>
     </div>
+  </div>
+</div>
+
+<!-- Déroulé de la journée à 3 (dès le 21/12/2026 : une fois par jour à l'ouverture, ou clic sur une journée) -->
+<div id="dayplan-modal" class="modal-backdrop hidden">
+  <div class="modal-card dayplan-card" role="dialog" aria-modal="true" aria-labelledby="dp-title">
+    <div id="dayplan-content"></div>
   </div>
 </div>
 
@@ -791,8 +846,11 @@ function renderDayCell(date, isCurrent, isToday) {
   // Le jour de Noël (chaque année, même un week-end), le Père Noël sort du bas de la case
   const santa = sch.date.endsWith('-12-25') ? SANTA_HTML : '';
   if (santa) cls.push('has-santa');
+  // À partir du 21/12, une journée travaillée s'ouvre sur son déroulé (organisation à 3)
+  const hasPlan = !sch.off && sch.date >= DAY_PLAN_SINCE;
+  if (hasPlan) cls.push('has-plan');
 
-  let html = `<div class="${cls.join(' ')}">`;
+  let html = `<div class="${cls.join(' ')}" data-date="${sch.date}"${hasPlan ? ` tabindex="0" role="button" aria-label="Voir le déroulé du ${fmtFR(sch.date)}"` : ''}>`;
   if (sch.warnings && sch.warnings.length) html += `<div class="warning-flag" title="${sch.warnings.join(' · ')}">!</div>`;
 
   const dayName = DAYS_FR[date.getDay()];
@@ -1160,13 +1218,14 @@ async function copyLeaveContent(btn) {
 function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
 function anyModalOpen() {
   return !document.getElementById('leave-modal').classList.contains('hidden')
-      || !document.getElementById('summer-modal').classList.contains('hidden');
+      || !document.getElementById('summer-modal').classList.contains('hidden')
+      || !document.getElementById('dayplan-modal').classList.contains('hidden');
 }
 document.getElementById('leave-modal').addEventListener('click', (e) => { if (e.target.id === 'leave-modal') closeModal('leave-modal'); });
 document.getElementById('summer-modal').addEventListener('click', (e) => { if (e.target.id === 'summer-modal') closeModal('summer-modal'); });
 document.addEventListener('keydown', (e) => {
   const modalOpen = anyModalOpen();
-  if (e.key === 'Escape') { closeModal('leave-modal'); closeModal('summer-modal'); }
+  if (e.key === 'Escape') { closeModal('leave-modal'); closeModal('summer-modal'); closeModal('dayplan-modal'); }
   if (!modalOpen) { if (e.key === 'ArrowLeft') prevMonth(); if (e.key === 'ArrowRight') nextMonth(); }
 });
 
@@ -1244,6 +1303,123 @@ fabTop.addEventListener('click', () => window.scrollTo({ top: 0, behavior: 'smoo
   };
   // Si l'écran de mot de passe est déjà parti (session authentifiée), on affiche tout de suite.
   // Sinon on attend sa disparition pour ne pas afficher le popup derrière, ni provoquer de flash.
+  if (!document.getElementById('lock-screen')) { show(); return; }
+  const obs = new MutationObserver(() => {
+    if (!document.getElementById('lock-screen')) { obs.disconnect(); show(); }
+  });
+  obs.observe(document.body, { childList: true });
+})();
+
+// ----- Déroulé de la journée à 3 (voir DAY_PLAN dans data.js) -----
+// Chaque ligne du modèle reçoit le shift réel du jour : concierge 1 = shift du matin à TB3, concierge 2 =
+// 2e shift à TB3, concierge 3 = TB4. En horaires réduits (tous en 9h-17h), l'ordre suit l'alternance de la
+// semaine. Si la journée ne colle pas au modèle (absence non remplacée, demi-journée…), on garde les
+// libellés génériques « Concierge 1/2/3 » et on renvoie au planning.
+const DP_KIND = { TB3: 'tb3', TB4: 'tb4', pause: 'pause', trajet: 'trajet' };
+const dpSpan = blocks => { const a = parseRange(blocks[0][1])[0], b = parseRange(blocks[blocks.length - 1][1])[1]; return [a, b]; };
+function dayPlanFor(dateStr) {
+  const d = parseD(dateStr), sch = genDay(d);
+  if (sch.off) return null;
+  const reduced = !!sch.reducedTB3;
+  const tpl = reduced ? DAY_PLAN.reduced : DAY_PLAN.normal;
+  let c1 = null, c2 = null;
+  const T3 = sch.TB3, T4 = sch.TB4;
+  if (!T3.slots) { c1 = T3.morning; c2 = T3.evening; }
+  else if (T3.slots.length === 2) {
+    const org = orgFor(dateStr).TB3.concierges, first = getWeekParity(d) === 0 ? org[0] : org[1];
+    [c1, c2] = (T3.slots[1].person === first || T3.slots[1].substituteFor === first) ? [T3.slots[1], T3.slots[0]] : T3.slots;
+  }
+  const c3 = T4.slots && T4.slots.length === 1 ? T4.slots[0] : null;
+  const shifts = [c1, c2, c3];
+  const fits = shifts.every((s, i) => {
+    const [a, b] = dpSpan(tpl[i].blocks);
+    return s && s.person && s.time === `${fmtH(a)}-${fmtH(b)}`;
+  });
+  return { date: dateStr, reduced, rows: tpl.map((r, i) => ({ ...r, shift: fits ? shifts[i] : null })), fits };
+}
+function dayPlanChart(plan) {
+  const spans = plan.rows.map(r => dpSpan(r.blocks));
+  const from = Math.min(...spans.map(s => s[0])), to = Math.max(...spans.map(s => s[1]));
+  const pct = h => (h - from) / (to - from) * 100;
+  // Graduations : toutes les bornes, sauf celles à moins de 20 min d'une autre ; décalées si trop proches
+  const pts = [...new Set(plan.rows.flatMap(r => r.blocks.flatMap(b => parseRange(b[1]))))].sort((a, b) => a - b);
+  const ticks = [];
+  for (const h of pts) {
+    const prev = ticks[ticks.length - 1];
+    if (prev && h - prev.h < 1 / 3) continue;
+    ticks.push({ h, low: !!prev && !prev.low && h - prev.h < .75 });
+  }
+  let html = '<div class="dp-chart">';
+  ticks.forEach((t, i) => {
+    const cls = ['dp-tick', t.low ? 'low' : '', i === 0 ? 'first' : '', i === ticks.length - 1 ? 'last' : ''].join(' ');
+    html += `<div class="${cls}" style="left:${pct(t.h)}%"><span>${fmtH(t.h)}</span></div>`;
+  });
+  plan.rows.forEach((r, i) => {
+    const s = r.shift, [a, b] = dpSpan(r.blocks);
+    const who = s ? SN(s.person) : `Concierge ${i + 1}`;
+    const detail = s
+      ? `${s.substituteFor ? `remplace ${SN(s.substituteFor)} · ` : ''}${fmtH(a)} – ${fmtH(b)}`
+      : `${fmtH(a)} – ${fmtH(b)}`;
+    html += `<div class="dp-row"><div class="dp-row-title">${r.building} — ${who}<small>${detail}</small></div><div class="dp-track">`;
+    for (const [kind, range, label] of r.blocks) {
+      const [x, y] = parseRange(range);
+      const txt = kind === 'trajet' ? '' : label;
+      html += `<div class="dp-bar ${DP_KIND[kind]}" style="left:calc(${pct(x)}% + 1.5px);width:calc(${pct(y) - pct(x)}% - 3px)" title="${label} · ${fmtH(x)} – ${fmtH(y)}">${txt}</div>`;
+    }
+    html += '</div></div>';
+  });
+  return html + '</div>';
+}
+function openDayPlan(dateStr) {
+  const plan = dayPlanFor(dateStr);
+  if (!plan) return;
+  const d = parseD(dateStr);
+  const dateLabel = `${DAYS_FR[d.getDay()]} ${d.getDate() === 1 ? '1er' : d.getDate()} ${MONTHS_FR[d.getMonth()].toLowerCase()} ${d.getFullYear()}`;
+  const hours = plan.reduced ? '<span class="dp-tag reduced">Horaires réduits · 9h–17h partout</span>'
+                             : '<span class="dp-tag">TB3 8h30–18h</span><span class="dp-tag">TB4 9h–17h</span>';
+  document.getElementById('dayplan-content').innerHTML = `
+    <div class="dp-head">
+      <div>
+        <div class="dp-kicker">Déroulé de la journée · organisation à 3</div>
+        <h2 class="dp-title" id="dp-title">${dateLabel}</h2>
+        <div class="dp-tags">${hours}</div>
+      </div>
+      <button class="dp-close" type="button" onclick="closeModal('dayplan-modal')" aria-label="Fermer">×</button>
+    </div>
+    <div class="dp-body">
+      ${plan.fits ? '' : '<div class="dp-note">Journée particulière (absence ou demi-journée) : le déroulé type est affiché, les horaires exacts sont dans le planning.</div>'}
+      ${dayPlanChart(plan)}
+      <div class="dp-legend">
+        <span><i style="background:#5279a8"></i>Présence TB3</span><span><i style="background:#3f8a70"></i>Présence TB4</span>
+        <span><i style="background:#d5d9de"></i>Déjeuner</span><span><i style="background:#c79a55"></i>Trajet</span>
+      </div>
+    </div>
+    <div class="dp-foot">
+      <span class="dp-hint">Cliquez sur une journée du planning pour voir son déroulé.</span>
+      <button class="dp-ok" type="button" onclick="closeModal('dayplan-modal')">Compris</button>
+    </div>`;
+  document.getElementById('dayplan-modal').classList.remove('hidden');
+}
+document.getElementById('dayplan-modal').addEventListener('click', (e) => { if (e.target.id === 'dayplan-modal') closeModal('dayplan-modal'); });
+// Clic (ou Entrée) sur une journée à partir du 21/12
+calEl.addEventListener('click', (e) => { const c = e.target.closest('.day-cell.has-plan'); if (c) openDayPlan(c.dataset.date); });
+calEl.addEventListener('keydown', (e) => {
+  const c = e.target.closest?.('.day-cell.has-plan');
+  if (c && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); openDayPlan(c.dataset.date); }
+});
+// Ouverture automatique : à partir du 21/12, une fois par jour et par appareil, sur la journée du jour
+// (ou la prochaine journée travaillée un week-end ou un jour férié)
+(function dayPlanPopup() {
+  if (todayStr < DAY_PLAN_SINCE) return;
+  const KEY = 'planning-dayplan-vu';
+  try { if (localStorage.getItem(KEY) === todayStr) return; } catch (e) {}
+  const d = new Date(today);
+  for (let i = 0; i < 10 && genDay(d).off; i++) d.setDate(d.getDate() + 1);
+  const show = () => {
+    if (anyModalOpen()) return;
+    openDayPlan(fmt(d));
+    try { localStorage.setItem(KEY, todayStr); } catch (e) {}
+  };
   if (!document.getElementById('lock-screen')) { show(); return; }
   const obs = new MutationObserver(() => {
     if (!document.getElementById('lock-screen')) { obs.disconnect(); show(); }

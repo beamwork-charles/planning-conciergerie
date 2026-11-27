@@ -79,6 +79,27 @@ const ORGANISATION = [
     TB3: { concierges: ['Emilie', 'Cédric'], shifts: ['8h30-16h30', '10h-18h'] },
     TB4: { concierges: ['Chiara'], shifts: ['9h-17h'] } },
 ];
+// ===== Déroulé d'une journée à 3 (à partir du 21/12/2026) =====
+// Pauses déjeuner décalées ; le 2e concierge de TB3 relève TB4 pendant la pause de son concierge, puis
+// revient. Affiché dans la fenêtre « Déroulé de la journée » (ouverte d'elle-même une fois par jour à
+// partir de DAY_PLAN_SINCE, ou en cliquant une journée du planning).
+// Une ligne par concierge : 1 = shift du matin à TB3, 2 = 2e shift à TB3, 3 = TB4.
+// Blocs : [lieu, plage, libellé] avec lieu 'TB3' | 'TB4' | 'pause' | 'trajet'.
+// En horaires réduits (tout le monde en 9h-17h), mêmes pauses et même relève, journée ramenée à 9h-17h.
+const DAY_PLAN_SINCE = '2026-12-21';
+const DAY_PLAN = {
+  normal: [
+    { building: 'TB3', blocks: [['TB3', '8h30-11h30', 'Accueil'], ['pause', '11h30-12h30', 'Pause'], ['TB3', '12h30-16h30', 'Accueil TB3']] },
+    { building: 'TB3', blocks: [['TB3', '10h-12h30', 'Accueil TB3'], ['pause', '12h30-13h30', 'Pause'], ['TB4', '13h30-14h30', 'TB4'], ['trajet', '14h30-14h45', 'Trajet'], ['TB3', '14h45-18h', 'Retour TB3']] },
+    { building: 'TB4', blocks: [['TB4', '9h-13h30', 'Accueil TB4'], ['pause', '13h30-14h30', 'Pause'], ['TB4', '14h30-17h', 'Accueil TB4']] }
+  ],
+  reduced: [
+    { building: 'TB3', blocks: [['TB3', '9h-11h30', 'Accueil'], ['pause', '11h30-12h30', 'Pause'], ['TB3', '12h30-17h', 'Accueil TB3']] },
+    { building: 'TB3', blocks: [['TB3', '9h-12h30', 'Accueil TB3'], ['pause', '12h30-13h30', 'Pause'], ['TB4', '13h30-14h30', 'TB4'], ['trajet', '14h30-14h45', 'Trajet'], ['TB3', '14h45-17h', 'Retour TB3']] },
+    { building: 'TB4', blocks: [['TB4', '9h-13h30', 'Accueil TB4'], ['pause', '13h30-14h30', 'Pause'], ['TB4', '14h30-17h', 'Accueil TB4']] }
+  ]
+};
+
 function orgFor(dateStr) {
   let cur = ORGANISATION[0];
   for (const o of ORGANISATION) if (o.since <= dateStr) cur = o;
